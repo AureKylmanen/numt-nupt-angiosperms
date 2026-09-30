@@ -9,7 +9,7 @@ to the Fisher's exact p-values SEPARATELY for NUPTs and NUMTs
 annotated tables with both raw and BH-adjusted (q-value) columns.
 
 Usage:
-    python3 bh_correction_dcnuxt.py \
+    python3 02_bh_correction_dcnuxt.py \
         all_species_nupt_kaks.tsv \
         all_species_numt_kaks.tsv
 
