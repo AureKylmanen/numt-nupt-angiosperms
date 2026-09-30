@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-dcnuxt_annotation_overlap.py   (v2 - fixed)
+dcnuxt_annotation_overlap.py
 
 Classify the genomic context of dcNUPTs and dcNUMTs against genome annotation.
 
@@ -42,14 +42,14 @@ Usage
       --base /vol/storage/5T_disk/organelles \
       --gff-dir /vol/storage/5T_disk/organelles/downloads/genome_fasta \
       --gff-dir /vol/storage/5T_disk/organelles/test_dataset/gff \
-      --audit-only --out-prefix dcnuxt_overlap_v2
+      --audit-only --out-prefix dcnuxt_overlap
 
   # full run
   python3 dcnuxt_annotation_overlap.py \
       --base /vol/storage/5T_disk/organelles \
       --gff-dir /vol/storage/5T_disk/organelles/downloads/genome_fasta \
       --gff-dir /vol/storage/5T_disk/organelles/test_dataset/gff \
-      --perms 1000 --out-prefix dcnuxt_overlap_v2
+      --perms 1000 --out-prefix dcnuxt_overlap
 """
 
 import argparse
@@ -460,13 +460,13 @@ def permute(idx, loci, seqlen, nperm, min_frac, rng):
 # main
 # --------------------------------------------------------------------------
 
-# Corrected tables ONLY. The older _kaks.csv / _kaks_c11.csv predate the
-# genetic-code and codon-frame fixes; reading them as a fallback would mix
-# pre- and post-fix data silently. A species without a fixed table is
-# reported as 'no_kaks_table', not substituted.
+# One table name per class, as written by 02_cnuxt_kaks/*_gene_alignment.sh.
+# There is deliberately no fallback to other names, so pre-fix tables
+# (old _kaks.csv / _kaks_c11.csv) cannot be mixed in silently. A species
+# without the table is reported as 'no_kaks_table'.
 KAKS_SUFFIXES = {
-    "NUPT": ["_kaks_c11_fixed.csv"],
-    "NUMT": ["_numt_kaks_fixed.csv"],
+    "NUPT": ["_nupt_kaks.csv"],
+    "NUMT": ["_numt_kaks.csv"],
 }
 BED_REL = {
     "NUPT": "nupts/nupts.clean.out_AllFrags.bed",
@@ -491,7 +491,7 @@ def main():
                     help="min fraction of the dcNUxT inside a feature for the strict call")
     ap.add_argument("--perms", type=int, default=1000)
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--out-prefix", default="dcnuxt_overlap_v2")
+    ap.add_argument("--out-prefix", default="dcnuxt_overlap")
     ap.add_argument("--audit-only", action="store_true")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
@@ -529,18 +529,14 @@ def main():
                 keys = sorted(bed_map)
 
                 # Exactly ONE table per species per kind. A species can appear
-                # in both species/ and multi_organelles/species/, and can have
-                # both results/ and results_v2/; without this the same rows
-                # were read more than once.
+                # in both species/ and multi_organelles/species/; the first
+                # directory with a table wins, so rows are never read twice.
                 hits, used = [], None
                 for sd in sdirs:
-                    for sub in ("results", "results_v2"):
-                        for suf in KAKS_SUFFIXES[kind]:
-                            p = os.path.join(sd, sub, species + suf)
-                            if os.path.exists(p):
-                                hits, used = read_kaks(p, args.min_ks), p
-                                break
-                        if used:
+                    for suf in KAKS_SUFFIXES[kind]:
+                        p = os.path.join(sd, "results", species + suf)
+                        if os.path.exists(p):
+                            hits, used = read_kaks(p, args.min_ks), p
                             break
                     if used:
                         break

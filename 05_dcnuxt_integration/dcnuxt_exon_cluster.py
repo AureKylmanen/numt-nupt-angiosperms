@@ -29,12 +29,12 @@ What it reports per locus
 Usage
 -----
   python3 dcnuxt_exon_cluster.py \
-      --loci dcnuxt_overlap_v2_loci.tsv \
+      --loci dcnuxt_overlap_loci.tsv \
       --csv  /vol/storage/5T_disk/organelles/combined_dataset.csv \
       --gff-dir /vol/storage/5T_disk/organelles/downloads/genome_fasta \
       --genome-dir /vol/storage/5T_disk/organelles/downloads/genome_fasta \
       --flank 300 \
-      --out-prefix dcnuxt_overlap_v2
+      --out-prefix dcnuxt_overlap
 """
 
 import argparse
@@ -201,7 +201,7 @@ def main():
     ap.add_argument("--genome-dir", action="append", default=[])
     ap.add_argument("--flank", type=int, default=0,
                     help="bp of flanking sequence to extract for RNA validation")
-    ap.add_argument("--out-prefix", default="dcnuxt_overlap_v2")
+    ap.add_argument("--out-prefix", default="dcnuxt_overlap")
     args = ap.parse_args()
 
     asm = {}
