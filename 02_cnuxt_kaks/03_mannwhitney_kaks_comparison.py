@@ -6,7 +6,7 @@ Compares the Ka/Ks distributions of dcNUPTs vs dcNUMTs using a
 Mann-Whitney U test.
 
 Usage:
-    python3 mannwhitney_kaks_comparison.py dcnupt_final_bh.tsv dcnumt_final_bh.tsv
+    python3 03_mannwhitney_kaks_comparison.py dcnupt_final_bh.tsv dcnumt_final_bh.tsv
 """
 
 import sys
