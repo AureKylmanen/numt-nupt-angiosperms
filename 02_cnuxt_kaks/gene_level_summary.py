@@ -3,7 +3,7 @@
 gene_level_summary.py
 
 Builds the gene-level summary of transfer and retention for plastid- and
-mitochondrial-derived insertions, from the corrected combined Ka/Ks tables
+mitochondrial-derived insertions, from the combined Ka/Ks tables (merge_kaks.py)
 and the BH-corrected dcNUxT tables.
 
 Reports per gene:
@@ -28,8 +28,8 @@ import pandas as pd
 
 BASE = "/vol/storage/5T_disk/organelles"
 
-NUPT_ALL = os.path.join(BASE, "all_species_nupt_kaks_fixed_combined.tsv")
-NUMT_ALL = os.path.join(BASE, "all_species_numt_kaks_fixed_combined.tsv")
+NUPT_ALL = os.path.join(BASE, "all_species_nupt_kaks.tsv")
+NUMT_ALL = os.path.join(BASE, "all_species_numt_kaks.tsv")
 DCNUPT = "dcnupt_final_bh.tsv"
 DCNUMT = "dcnumt_final_bh.tsv"
 GENE_LENGTHS = "gene_lengths.tsv"

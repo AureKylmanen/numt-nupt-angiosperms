@@ -2,7 +2,7 @@
 """
 bh_correction_dcnuxt.py
 
-Filters the combined, corrected NUPT and NUMT Ka/Ks tables to the
+Filters the combined NUPT and NUMT Ka/Ks tables (from merge_kaks.py) to the
 dcNUxT threshold (Ks > 0.1), applies Benjamini-Hochberg correction
 to the Fisher's exact p-values SEPARATELY for NUPTs and NUMTs
 (treated as two independent test families), and writes final
@@ -10,8 +10,8 @@ annotated tables with both raw and BH-adjusted (q-value) columns.
 
 Usage:
     python3 bh_correction_dcnuxt.py \
-        all_species_nupt_kaks_fixed_combined.tsv \
-        all_species_numt_kaks_fixed_combined.tsv
+        all_species_nupt_kaks.tsv \
+        all_species_numt_kaks.tsv
 
 Outputs:
     dcnupt_final_bh.tsv
@@ -53,7 +53,7 @@ def benjamini_hochberg(pvals):
 def process_class(path, label):
     df = pd.read_csv(path, sep="\t")
 
-    # Standardize expected column names (from merge_kaks_fixed.sh header)
+    # Column names as written by merge_kaks.py (Ka_Ks, P_Value_Fisher, ...)
     df.columns = [c.strip() for c in df.columns]
 
     n_total = len(df)

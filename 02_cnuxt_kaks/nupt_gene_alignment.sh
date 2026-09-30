@@ -378,7 +378,7 @@ while IFS=',' read -r SPECIES ASSEMBLY PLASTID MITO; do
     done
     wait
 
-    AXT="$RESULTS/input.axt"
+    AXT="$RESULTS/nupt_input.axt"
     : > "$AXT"
 
     for aln in "$ALIGN_PLASTID"/*.mafft; do
@@ -387,7 +387,7 @@ while IFS=',' read -r SPECIES ASSEMBLY PLASTID MITO; do
     done
 
     if [[ -s "$AXT" ]]; then
-        echo "Running _Calculator for $SPECIES"
+        echo "Running KaKs_Calculator for $SPECIES"
         "$KAKS_BIN" -i "$AXT" -c 11 -o "$RESULTS/${SPECIES}_nupt_kaks.csv" -m LWL
     else
         echo "No valid alignments for $SPECIES (AXT empty), skipping KaKs."
