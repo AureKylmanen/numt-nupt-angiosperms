@@ -10,7 +10,7 @@ fixed property of the gene), as opposed to the average matched-fragment
 length (which varies per insertion and is NOT what we want here).
 
 Usage:
-    python3 build_gene_lengths.py
+    04_python3 build_gene_lengths.py
 Output:
     gene_lengths.tsv   (gene, length_bp, n_copies_averaged, source)
 """
