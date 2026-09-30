@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-gene_level_summary.py
+05_gene_level_summary.py
 
 Builds the gene-level summary of transfer and retention for plastid- and
 mitochondrial-derived insertions, from the combined Ka/Ks tables (merge_kaks.py)
@@ -18,7 +18,7 @@ Reports per gene:
     gene_len    reference gene length, if gene_lengths.tsv is available
 
 Usage:
-    python3 gene_level_summary.py [--min-sel 1] [--latex]
+    05_python3 gene_level_summary.py [--min-sel 1] [--latex]
 """
 
 import os
