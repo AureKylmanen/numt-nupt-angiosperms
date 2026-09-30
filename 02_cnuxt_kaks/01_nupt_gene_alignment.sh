@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================================
-# Script Name: nupt_gene_alignment.sh
+# Script Name: 01_nupt_gene_alignment.sh
 # Description: NUPT Ka/Ks pipeline for plants with BLAST prefilter
 # Created: 27.3.2026
 # Author: Aure Kylmänen
