@@ -88,7 +88,7 @@ def parse_axt(axt_path):
 
 kaks_files = sorted(glob.glob(
     os.path.join(SPECIES_DIR, "*/results/*_numt_kaks.csv")))
-print(f"Found {len(kaks_files)} corrected NUMT KaKs files")
+print(f"Found {len(kaks_files)} NUMT KaKs files")
 
 n_collected = 0
 n_missing_seq = 0
@@ -100,7 +100,7 @@ seen_by_species_gene = {}
 
 for kaks_file in kaks_files:
     species = kaks_file.split(os.sep)[-3]
-    axt_file = os.path.join(SPECIES_DIR, species, "results", "numt_input_fixed.axt")
+    axt_file = os.path.join(SPECIES_DIR, species, "results", "numt_input.axt")
 
     if not os.path.exists(axt_file):
         n_missing_axt += 1
@@ -158,7 +158,7 @@ print(f"  Sequences collected: {n_collected}")
 print(f"  Species contributing: {len(species_contributing)}")
 print(f"  Redundant copies collapsed: {n_redundant}")
 print(f"  Skipped (id not found in AXT): {n_missing_seq}")
-print(f"  Species with no numt_input_fixed.axt: {n_missing_axt}")
+print(f"  Species with no numt_input.axt: {n_missing_axt}")
 EOF
 
 echo "Genes collected: $(ls "$OUT_DIR/per_gene/" 2>/dev/null | wc -l)"

@@ -4,7 +4,7 @@
 
 Usage:
     python3 04_rebuild_subtrees_and_alignments.py [--levels 3] [--max-taxa 50]
-                                               [--threads 5] [--organelle plastid|mito]
+                                               [--threads 5] [--organelle nupt|numt]
                                                [selection_dir]
 """
 
@@ -19,12 +19,27 @@ import dendropy
 
 BASE_DIR = "/vol/storage/5T_disk/organelles"
 
-# Set by --organelle; plastid is the default. pal2nal -codontable uses NCBI
+
+def normalise_organelle(kind):
+    """Accept nupt/plastid and numt/mito; return 'plastid' or 'mito'."""
+    k = kind.lower()
+    if k in ("nupt", "plastid"):
+        return "plastid"
+    if k in ("numt", "mito"):
+        return "mito"
+    sys.exit(f"--organelle must be nupt or numt (got {kind!r})")
+
+
+def default_selection_dir(organelle):
+    return os.path.join(BASE_DIR, "selection_numt" if organelle == "mito"
+                        else "selection_nupt")
+
+# Set by --organelle (nupt default, or numt). pal2nal -codontable uses NCBI
 # numbering: 11 is the plant plastid code, 1 the standard code, which is
 # correct for plant mitochondria. This is a different scheme from codeml's
 # icode (set to 0 elsewhere).
-CLUSTER_DIR = os.path.join(BASE_DIR, "clustering", "clusters")
-SINGLES_DIR = os.path.join(BASE_DIR, "clustering", "singles")
+CLUSTER_DIR = os.path.join(BASE_DIR, "clustering_nupt", "clusters")
+SINGLES_DIR = os.path.join(BASE_DIR, "clustering_nupt", "singles")
 NCBI_CODON_TABLE = 11
 BG_ALL_NAME = "all_plastid.fasta"
 
@@ -40,8 +55,8 @@ def set_organelle(kind):
         NCBI_CODON_TABLE = 1
         BG_ALL_NAME = "all_mito.fasta"
     else:
-        CLUSTER_DIR = os.path.join(BASE_DIR, "clustering", "clusters")
-        SINGLES_DIR = os.path.join(BASE_DIR, "clustering", "singles")
+        CLUSTER_DIR = os.path.join(BASE_DIR, "clustering_nupt", "clusters")
+        SINGLES_DIR = os.path.join(BASE_DIR, "clustering_nupt", "singles")
         NCBI_CODON_TABLE = 11
         BG_ALL_NAME = "all_plastid.fasta"
 
@@ -250,10 +265,9 @@ def main():
     levels = opt("--levels", 3)
     max_taxa = opt("--max-taxa", 50)
     threads = opt("--threads", 5)
-    organelle = opt("--organelle", "plastid", str)
+    organelle = normalise_organelle(opt("--organelle", "nupt", str))
     set_organelle(organelle)
-    default_sel = "selection_numt" if organelle == "mito" else "selection"
-    out_dir = argv[0] if argv else os.path.join(BASE_DIR, default_sel)
+    out_dir = argv[0] if argv else default_selection_dir(organelle)
     print(f"organelle={organelle}  codontable={NCBI_CODON_TABLE}")
 
     for sub in ("subtrees", "codon_alignments"):
@@ -287,7 +301,8 @@ def main():
         print(f"\nSubtree size (taxa) for the {len(s)} usable analyses:")
         print(f"  min={s[0]}  median={s[len(s)//2]}  "
               f"90th={s[int(len(s)*0.9)]}  max={s[-1]}")
-        print("\nNext: python3 05_run_codeml_stage.py --threads 5 [--organelle mito]")
+        print("\nNext: python3 05_run_codeml_stage.py --threads 5 --organelle "
+              + ("numt" if organelle == "mito" else "nupt"))
 
 
 if __name__ == "__main__":

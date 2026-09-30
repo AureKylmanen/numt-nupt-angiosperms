@@ -21,7 +21,7 @@ BASE_DIR="/vol/storage/5T_disk/organelles"
 SPECIES_DIR="$BASE_DIR/species"
 PLASTID_DB="/vol/storage/pt_database/plastid_db"
 KAKS_BIN="/vol/storage/software/KaKs_Calculator2.0/bin/Linux/KaKs_Calculator"
-OUT_DIR="$BASE_DIR/clustering"
+OUT_DIR="$BASE_DIR/clustering_nupt"
 THREADS=12
 MAFFT_THREADS=4
 KS_BETWEEN=0.1
@@ -43,7 +43,7 @@ import os, glob
  
 BASE_DIR = "/vol/storage/5T_disk/organelles"
 SPECIES_DIR = os.path.join(BASE_DIR, "species")
-OUT_DIR = os.path.join(BASE_DIR, "clustering")
+OUT_DIR = os.path.join(BASE_DIR, "clustering_nupt")
 KS_THRESH = 0.1
  
 GENE_SYNONYMS = {f"nd{i}": f"nad{i}" for i in range(1, 10)}
@@ -88,7 +88,7 @@ def parse_axt(axt_path):
  
 kaks_files = sorted(glob.glob(
     os.path.join(SPECIES_DIR, "*/results/*_nupt_kaks.csv")))
-print(f"Found {len(kaks_files)} corrected KaKs files")
+print(f"Found {len(kaks_files)} NUPT KaKs files")
  
 n_collected = 0
 n_missing_seq = 0
@@ -108,7 +108,7 @@ seen_by_species_gene = {}
  
 for kaks_file in kaks_files:
     species = kaks_file.split(os.sep)[-3]
-    axt_file = os.path.join(SPECIES_DIR, species, "results", "input_fixed.axt")
+    axt_file = os.path.join(SPECIES_DIR, species, "results", "nupt_input.axt")
  
     if not os.path.exists(axt_file):
         n_missing_axt += 1
@@ -166,7 +166,7 @@ print(f"  Sequences collected: {n_collected}")
 print(f"  Species contributing: {len(species_contributing)}")
 print(f"  Redundant copies collapsed: {n_redundant}")
 print(f"  Skipped (id not found in AXT): {n_missing_seq}")
-print(f"  Species with no input_fixed.axt: {n_missing_axt}")
+print(f"  Species with no nupt_input.axt: {n_missing_axt}")
 EOF
  
 echo "Genes collected: $(ls "$OUT_DIR/per_gene/" 2>/dev/null | wc -l)"
@@ -286,7 +286,7 @@ import os, glob, subprocess
 from collections import defaultdict
  
 BASE_DIR = "/vol/storage/5T_disk/organelles"
-OUT_DIR = os.path.join(BASE_DIR, "clustering")
+OUT_DIR = os.path.join(BASE_DIR, "clustering_nupt")
 PLASTID_DB = "/vol/storage/pt_database/plastid_db"
 KS_THRESH = 0.1
 IDENTITY_THRESH = 98.0

@@ -3,11 +3,12 @@
 03_build_trees_iqtree.py
 
 ML protein trees (IQ-TREE 2, LG, -fast) for every combined background +
-dcNUxT alignment. For NUMTs pass the selection_numt directory.
+dcNUxT alignment. Reads/writes selection_nupt/ or selection_numt/.
 
 Usage:
-    python3 03_build_trees_iqtree.py [--jobs 7] [--threads 4]
-                                  [--model LG] [--force] [selection_dir]
+    python3 03_build_trees_iqtree.py [--organelle nupt|numt] [--jobs 7]
+                                     [--threads 4] [--model LG] [--force]
+                                     [selection_dir]
 """
 
 import os
@@ -19,6 +20,21 @@ import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 BASE_DIR = "/vol/storage/5T_disk/organelles"
+
+
+def normalise_organelle(kind):
+    """Accept nupt/plastid and numt/mito; return 'plastid' or 'mito'."""
+    k = kind.lower()
+    if k in ("nupt", "plastid"):
+        return "plastid"
+    if k in ("numt", "mito"):
+        return "mito"
+    sys.exit(f"--organelle must be nupt or numt (got {kind!r})")
+
+
+def default_selection_dir(organelle):
+    return os.path.join(BASE_DIR, "selection_numt" if organelle == "mito"
+                        else "selection_nupt")
 
 
 def build_one(args):
@@ -66,7 +82,8 @@ def main():
     jobs = opt("--jobs", 7)
     threads = opt("--threads", 4)
     model = opt("--model", "LG", str)
-    out_dir = argv[0] if argv else os.path.join(BASE_DIR, "selection")
+    organelle = normalise_organelle(opt("--organelle", "nupt", str))
+    out_dir = argv[0] if argv else default_selection_dir(organelle)
 
     os.makedirs(os.path.join(out_dir, "trees"), exist_ok=True)
 
@@ -114,7 +131,8 @@ def main():
         pass
 
     print("\nNext: python3 04_rebuild_subtrees_and_alignments.py "
-          "--levels 3 --max-taxa 50 --threads 5 [--organelle mito]")
+          f"--levels 3 --max-taxa 50 --threads 5 --organelle "
+          f"{'numt' if organelle == 'mito' else 'nupt'}")
 
 
 if __name__ == "__main__":

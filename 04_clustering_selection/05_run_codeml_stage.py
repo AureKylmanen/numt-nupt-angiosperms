@@ -9,7 +9,7 @@ and skips any that already have parseable output unless --force is given.
 
 Usage:
     python3 05_run_codeml_stage.py [--threads N] [--force]
-                                   [--organelle plastid|mito] [selection_dir]
+                                   [--organelle nupt|numt] [selection_dir]
 
 Re-running without --force skips finished codeml runs and only re-parses,
 so it also replaces the former standalone parser (06_parse_codeml_results.py).
@@ -27,8 +27,23 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from scipy import stats
 
 BASE_DIR = "/vol/storage/5T_disk/organelles"
-CLUSTER_DIR = os.path.join(BASE_DIR, "clustering", "clusters")
-SINGLES_DIR = os.path.join(BASE_DIR, "clustering", "singles")
+
+
+def normalise_organelle(kind):
+    """Accept nupt/plastid and numt/mito; return 'plastid' or 'mito'."""
+    k = kind.lower()
+    if k in ("nupt", "plastid"):
+        return "plastid"
+    if k in ("numt", "mito"):
+        return "mito"
+    sys.exit(f"--organelle must be nupt or numt (got {kind!r})")
+
+
+def default_selection_dir(organelle):
+    return os.path.join(BASE_DIR, "selection_numt" if organelle == "mito"
+                        else "selection_nupt")
+CLUSTER_DIR = os.path.join(BASE_DIR, "clustering_nupt", "clusters")
+SINGLES_DIR = os.path.join(BASE_DIR, "clustering_nupt", "singles")
 
 
 def set_organelle(kind):
@@ -44,8 +59,8 @@ def set_organelle(kind):
         CLUSTER_DIR = os.path.join(BASE_DIR, "clustering_numt", "clusters")
         SINGLES_DIR = os.path.join(BASE_DIR, "clustering_numt", "singles")
     else:
-        CLUSTER_DIR = os.path.join(BASE_DIR, "clustering", "clusters")
-        SINGLES_DIR = os.path.join(BASE_DIR, "clustering", "singles")
+        CLUSTER_DIR = os.path.join(BASE_DIR, "clustering_nupt", "clusters")
+        SINGLES_DIR = os.path.join(BASE_DIR, "clustering_nupt", "singles")
 
 OMEGA_BOUND = 10.0   # above this, dS is ~0 and omega is uninformative
 
@@ -327,11 +342,10 @@ def main():
     organelle = "plastid"
     if "--organelle" in argv:
         i = argv.index("--organelle")
-        organelle = argv[i + 1]
+        organelle = normalise_organelle(argv[i + 1])
         del argv[i:i + 2]
     set_organelle(organelle)
-    default_sel = "selection_numt" if organelle == "mito" else "selection"
-    out_dir = argv[0] if argv else os.path.join(BASE_DIR, default_sel)
+    out_dir = argv[0] if argv else default_selection_dir(organelle)
     print(f"organelle={organelle}")
 
     names = sorted(

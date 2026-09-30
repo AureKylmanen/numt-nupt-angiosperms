@@ -19,9 +19,9 @@ IFS=$'\n\t'
 
 BASE_DIR="/vol/storage/5T_disk/organelles"
 PLASTID_GENES_DIR="$BASE_DIR/downloads/plastid_genes"
-CLUSTER_DIR="$BASE_DIR/clustering/clusters"
-SINGLES_DIR="$BASE_DIR/clustering/singles"
-OUT_DIR="$BASE_DIR/selection"
+CLUSTER_DIR="$BASE_DIR/clustering_nupt/clusters"
+SINGLES_DIR="$BASE_DIR/clustering_nupt/singles"
+OUT_DIR="$BASE_DIR/selection_nupt"
 THREADS=5
 MAFFT_THREADS=4
 GENETIC_CODE=11   # NCBI table 11, plant plastid
@@ -46,7 +46,7 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 
 PLASTID_DIR = "/vol/storage/5T_disk/organelles/downloads/plastid_genes"
-OUT_DIR = "/vol/storage/5T_disk/organelles/selection/background"
+OUT_DIR = "/vol/storage/5T_disk/organelles/selection_nupt/background"
 MAFFT_THREADS = 4
 GENETIC_CODE = 11
 
@@ -136,7 +136,7 @@ echo "[3] Aligning clusters/singles into background with MAFFT --add..."
 
 # Background alignments are named from the plastid gene FASTA filenames,
 # which keep their original capitalisation (atpA, rbcL, psbB...). Cluster
-# names, however, come from cluster_dcnupts.sh, which normalises gene names
+# names, however, come from 01_cluster_dcnupts.sh, which normalises gene names
 # to lowercase. Resolve case-insensitively so clusters find their background.
 resolve_bg() {
     local gene="$1"
