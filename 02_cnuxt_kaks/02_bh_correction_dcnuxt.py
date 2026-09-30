@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-bh_correction_dcnuxt.py
+02_bh_correction_dcnuxt.py
 
 Filters the combined NUPT and NUMT Ka/Ks tables (from merge_kaks.py) to the
 dcNUxT threshold (Ks > 0.1), applies Benjamini-Hochberg correction
