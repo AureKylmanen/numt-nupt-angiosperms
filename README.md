@@ -114,25 +114,21 @@ Run in this order:
  
 | # | Script | Purpose |
 |---|---|---|
-| 1 | `gb_to_fasta.py` | Extract plastid CDS from GenBank records into `downloads/plastid_genes/<ACC>/<gene>.fasta` |
-| 2 | `nupt_gene_alignment.sh` / `numt_gene_alignment.sh` | ORF filter (≥ 90 bp in any of six frames) → BLASTN pre-filter against the host's organelle genes (≥ 70 % identity, ≥ 50 % query cover, e ≤ 1e-5) → MAFFT alignment of each fragment and its reverse complement to each candidate gene → gap-free, in-frame, stop-free codon alignments → KaKs_Calculator (LWL) |
-| 3 | `merge_kaks.py` | Combine per-species tables into `all_species_{nupt,numt}_kaks.tsv`: adds `Species`, makes column names identifier-safe (`Ka/Ks` → `Ka_Ks`, `P-Value(Fisher)` → `P_Value_Fisher`), keeps rows with a numeric Ka/Ks |
-| 4 | `bh_correction_dcnuxt.py` | Keep Ks > 0.1 (dcNUxTs); Benjamini–Hochberg correction of the Fisher exact test p-values, separately for NUPTs and NUMTs |
-| 5 | `mannwhitney_kaks_comparison.py` | Compare dcNUPT and dcNUMT Ka/Ks distributions (Mann–Whitney U, rank-biserial r) |
-| 6 | `build_gene_lengths.py` | Reference length of each organellar gene, averaged across accessions |
-| 7 | `gene_level_summary.py` | Per gene: cNUxT and dcNUxT counts, species breadth, fraction old (ret%), fraction under purifying selection (sel%) |
-| 8 | `gene_predictors.py` | Gene length vs transfer and retention; length-normalised transfer vs retention; NUPT vs NUMT comparison (Fisher r-to-z) |
+| 1 | `01_nupt_gene_alignment.sh` / `01_numt_gene_alignment.sh` | ORF filter (≥ 90 bp in any of six frames) → BLASTN pre-filter against the host's organelle genes (≥ 70 % identity, ≥ 50 % query cover, e ≤ 1e-5) → MAFFT alignment of each fragment and its reverse complement to each candidate gene → gap-free, in-frame, stop-free codon alignments → KaKs_Calculator (LWL) |
+| 2 | `02_bh_correction_dcnuxt.py` | Keep Ks > 0.1 (dcNUxTs); Benjamini–Hochberg correction of the Fisher exact test p-values, separately for NUPTs and NUMTs |
+| 3 | `03_mannwhitney_kaks_comparison.py` | Compare dcNUPT and dcNUMT Ka/Ks distributions (Mann–Whitney U, rank-biserial r) |
+| 4 | `04_build_gene_lengths.py` | Reference length of each organellar gene, averaged across accessions |
+| 5 | `05_gene_level_summary.py` | Per gene: cNUxT and dcNUxT counts, species breadth, fraction old (ret%), fraction under purifying selection (sel%) |
+| 6 | `06_gene_predictors.py` | Gene length vs transfer and retention; length-normalised transfer vs retention; NUPT vs NUMT comparison (Fisher r-to-z) |
  
 ```bash
-./02_cnuxt_kaks/nupt_gene_alignment.sh combined_dataset.csv
-./02_cnuxt_kaks/numt_gene_alignment.sh combined_dataset.csv
-python3 02_cnuxt_kaks/merge_kaks.py nupt      # species/ and multi_organelles/species/
-python3 02_cnuxt_kaks/merge_kaks.py numt
-python3 02_cnuxt_kaks/bh_correction_dcnuxt.py all_species_nupt_kaks.tsv all_species_numt_kaks.tsv
-python3 02_cnuxt_kaks/mannwhitney_kaks_comparison.py dcnupt_final_bh.tsv dcnumt_final_bh.tsv
-python3 02_cnuxt_kaks/build_gene_lengths.py            # run from <BASE>
-python3 02_cnuxt_kaks/gene_level_summary.py --latex
-python3 02_cnuxt_kaks/gene_predictors.py --min-cnuxt 5 --min-dcnuxt 3
+./02_cnuxt_kaks/01_nupt_gene_alignment.sh combined_dataset.csv
+./02_cnuxt_kaks/01_numt_gene_alignment.sh combined_dataset.csv
+python3 02_cnuxt_kaks/02_bh_correction_dcnuxt.py all_species_nupt_kaks.tsv all_species_numt_kaks.tsv
+python3 02_cnuxt_kaks/03_mannwhitney_kaks_comparison.py dcnupt_final_bh.tsv dcnumt_final_bh.tsv
+python3 02_cnuxt_kaks/04_build_gene_lengths.py            # run from <BASE>
+python3 02_cnuxt_kaks/05_gene_level_summary.py --latex
+python3 02_cnuxt_kaks/06_gene_predictors.py --min-cnuxt 5 --min-dcnuxt 3
 ```
  
 **Genetic codes.** Plant plastids use NCBI translation table 11 and plant mitochondria
@@ -257,7 +253,8 @@ evidence of mislabelling or contamination.
 |---|---|
 | `plot_ks_distribution.R` | Ks histogram of cNUxTs with the dcNUxT threshold: `Rscript figures/plot_ks_distribution.R nupt` (or `numt`) |
 | `fetch_taxonomy.py` | Order/family lookup from NCBI Taxonomy for clade labels |
- 
+| `plot_proportion_fan.py` | Fan phylogenetic tree coloured by log10(proportion) |
+| `make_colorbar.py` |  Generate a standalone colourbar PDF to go with the fan plots. |
 Figures of the PGLS panels are written by `03_comparative/03_plot_pgls_panels.R`.
  
 ---
