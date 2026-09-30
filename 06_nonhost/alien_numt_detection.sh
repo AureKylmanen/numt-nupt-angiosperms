@@ -71,7 +71,7 @@ RESUME="${RESUME:-0}"
 # Upstream NUMT Ka/Ks analysis settings.
 RESULTS_SUBDIR="results"
 ALIGN_SUBDIR="alignments/mito"
-KAKS_BASENAME_FMT="%s_numt_kaks_fixed.csv"   # Set to the basename produced by the upstream NUMT analysis.
+KAKS_BASENAME_FMT="%s_numt_kaks.csv"         # as written by 02_cnuxt_kaks/numt_gene_alignment.sh
 
 COMBINED_OUT="$BASE_DIR/all_numt_blast_hits.tsv"
 SUMMARY_OUT="$BASE_DIR/numt_summary_table.tsv"

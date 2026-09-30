@@ -55,7 +55,7 @@ set -euo pipefail
 
 BASE_DIR="/vol/storage/5T_disk/organelles"
 SP_DIR="$BASE_DIR/species"
-SPECIES_LIST="$BASE_DIR/dataset.csv"                    # SPECIES,ASSEMBLY,PLASTID,MITO
+SPECIES_LIST="$BASE_DIR/combined_dataset.csv"           # SPECIES,ASSEMBLY,PLASTID,MITO
 PLASTID_DB="/vol/storage/pt_database/plastid_db"        # Pooled plastid BLAST database
 HOST_PLASTID_DIR="$BASE_DIR/downloads/plastid_fasta"    # Host plastid FASTA files
 HOST_PLASTID_DIR2="$BASE_DIR/multi_organelles/downloads/plastid_fasta"
@@ -76,11 +76,11 @@ RESUME="${RESUME:-0}"
 # Ka/Ks table produced by the upstream NUPT analysis.
 RESULTS_SUBDIR="results"
 ALIGN_SUBDIR="alignments/plastid"
-KAKS_BASENAME_FMT="%s_kaks_c11_fixed.csv"
+KAKS_BASENAME_FMT="%s_nupt_kaks.csv"           # as written by 02_cnuxt_kaks/nupt_gene_alignment.sh
 
-COMBINED_OUT="$BASE_DIR/all_blast_hits.tsv"
-SUMMARY_OUT="$BASE_DIR/summary_table.tsv"
-CATEGORIES_OUT="$BASE_DIR/all_query_categories.tsv"
+COMBINED_OUT="$BASE_DIR/all_nupt_blast_hits.tsv"
+SUMMARY_OUT="$BASE_DIR/nupt_summary_table.tsv"
+CATEGORIES_OUT="$BASE_DIR/all_nupt_query_categories.tsv"
 
 ############################################
 # HELPERS
