@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================================
-# Script Name: numt_gene_alignment.sh
+# Script Name: 01_numt_gene_alignment.sh
 # Description: NUMT Ka/Ks pipeline for plants with BLAST prefilter
 # Adapted from nupt_gene_alignment.sh
 # Author: Aure Kylmänen
