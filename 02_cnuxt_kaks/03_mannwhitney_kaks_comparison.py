@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-mannwhitney_kaks_comparison.py
+03_mannwhitney_kaks_comparison.py
 
 Compares the Ka/Ks distributions of dcNUPTs vs dcNUMTs using a
 Mann-Whitney U test.
