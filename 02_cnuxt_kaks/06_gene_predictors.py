@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-gene_predictors.py
+06_gene_predictors.py
 
 Tests what predicts how often an organellar gene is transferred to the
 nucleus, and how often a transferred copy is retained under purifying
@@ -28,7 +28,7 @@ Between organelles, correlations are compared with Fisher's r-to-z, which
 tests whether two independent correlation coefficients differ.
 
 Usage:
-    python3 gene_predictors.py [--min-cnuxt 5] [--min-dcnuxt 3]
+    python3 06_gene_predictors.py [--min-cnuxt 5] [--min-dcnuxt 3]
 """
 
 import sys
