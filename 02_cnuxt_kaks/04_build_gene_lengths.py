@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-build_gene_lengths.py
+04_build_gene_lengths.py
 
 Extracts canonical reference gene lengths directly from the per-species
 gene FASTA files (downloads/plastid_genes/*/*.fasta and
