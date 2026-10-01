@@ -15,108 +15,122 @@ Output:
     gene_lengths.tsv   (gene, length_bp, n_copies_averaged, source)
 """
 
-import os
 import glob
-import re
+import os
+import sys
 
-PLASTID_DIR = "downloads/plastid_genes"
-MITO_DIR = "downloads/mito_genes"
+import pandas as pd
+
+SPECIES_TSV = "final_species_summary_v2.tsv"
+DATASET = "combined_dataset.csv"
+ROOTS = ["downloads", "multi_organelles/downloads"]
 OUTPUT = "gene_lengths.tsv"
 
-# Known synonym mapping: nd1-nd9 and nad1-nad9 refer to the same genes
-# under two different standard mitochondrial gene naming conventions
-# (NCBI-style vs MITOS-style). This is NOT a typo/case issue - it needs
-# explicit mapping. Extend this dict if you spot other known synonyms.
 GENE_SYNONYMS = {f"nd{i}": f"nad{i}" for i in range(1, 10)}
 GENE_SYNONYMS["nd4l"] = "nad4l"
+GENE_SYNONYMS["cytb"] = "cob"
+
+CHECK_GENES = ["rps3", "rpl2", "rps4", "rps14", "ycf2", "psba", "rbcl",
+               "psbd", "atpa", "atp1"]
 
 
-def normalize_gene_name(raw_name):
-    """Lowercase and apply known synonym mapping. Does NOT collapse
-    suffix/isoform variants (e.g. atp1-1 vs atp1-2, nad4l-a vs nad4l-b) -
-    those may represent genuinely distinct gene copies and should be
-    reviewed manually before deciding whether to merge them."""
-    name = raw_name.lower()
-    name = GENE_SYNONYMS.get(name, name)
-    return name
+def normalize_gene_name(raw):
+    name = raw.lower()
+    # product-named files: "ribulose-1,5-bisphosphate carboxylase_oxygenase
+    # large subunit" (the "/" became "_") is rbcL
+    if name.endswith("oxygenase large subunit"):
+        return "rbcl"
+    return GENE_SYNONYMS.get(name, name)
 
 
-def fasta_seq_length(path):
-    """Return the length of the (single) sequence in a fasta file."""
-    length = 0
+def fasta_len(path):
+    n = 0
     with open(path) as f:
         for line in f:
-            if line.startswith(">"):
-                continue
-            length += len(line.strip())
-    return length
+            if not line.startswith(">"):
+                n += len(line.strip())
+    return n
 
 
-def is_clean_gene_name(raw_name):
-    """Reject filenames that aren't clean gene symbols: entries with
-    spaces, apostrophes, or explicit 'pseudo' labels (e.g. "pseudo
-    rpl23", "pseudo 3'-rps12a", "rps 7") are annotation artifacts, not
-    standard gene names, and would corrupt per-gene averages if pooled
-    under inconsistent keys."""
-    if " " in raw_name or "'" in raw_name:
-        return False
-    if "pseudo" in raw_name.lower():
-        return False
-    return True
+def accession_dirs(kind, acc):
+    """Folders for an accession, versioned or not, in every root."""
+    acc = str(acc).strip()
+    base = acc.split(".")[0]
+    out = []
+    for r in ROOTS:
+        for pat in (f"{r}/{kind}/{base}", f"{r}/{kind}/{base}.*"):
+            out += [p for p in glob.glob(pat) if os.path.isdir(p)]
+    return sorted(set(out))
 
 
-def collect_gene_lengths(base_dir, exclude_name, source_label):
-    gene_lengths = {}  # gene -> list of lengths across species
-    skipped = []
-    dirs = glob.glob(f"{base_dir}/*/")
+def species_dirs(kind, species):
+    return [p for r in ROOTS for p in glob.glob(f"{r}/{kind}/{species}")
+            if os.path.isdir(p)]
+
+
+def gene_records(dirs, species, source):
+    rec = []
     for d in dirs:
-        for fasta in glob.glob(os.path.join(d, "*.fasta")):
-            fname = os.path.basename(fasta)
-            if fname == exclude_name:
+        for f in glob.glob(os.path.join(d, "*.fasta")):
+            fname = os.path.basename(f)
+            if fname.startswith("all_"):
                 continue
-            gene_raw = fname.replace(".fasta", "")
-            if not is_clean_gene_name(gene_raw):
-                skipped.append(gene_raw)
-                continue
-            gene = normalize_gene_name(gene_raw)
-            length = fasta_seq_length(fasta)
+            length = fasta_len(f)
             if length > 0:
-                gene_lengths.setdefault(gene, []).append(length)
-    if skipped:
-        unique_skipped = sorted(set(skipped))
-        print(f"  [{source_label}] Skipped {len(skipped)} files with non-standard names "
-              f"({len(unique_skipped)} unique): {unique_skipped[:15]}"
-              f"{'...' if len(unique_skipped) > 15 else ''}")
-    return gene_lengths, source_label
+                gene = normalize_gene_name(fname[: -len(".fasta")])
+                rec.append((species, source, gene, length))
+    return rec
 
 
 def main():
-    plastid_lengths, _ = collect_gene_lengths(PLASTID_DIR, "all_plastid.fasta", "plastid")
-    mito_lengths, _ = collect_gene_lengths(MITO_DIR, "all_mito.fasta", "mito")
+    for p in (SPECIES_TSV, DATASET):
+        if not os.path.exists(p):
+            sys.exit(f"missing {p}; run from the organelles base directory")
 
-    rows = []
-    for gene, lengths in plastid_lengths.items():
-        avg_len = sum(lengths) / len(lengths)
-        rows.append((gene, round(avg_len, 1), len(lengths), "plastid"))
+    species = set(pd.read_csv(SPECIES_TSV, sep="\t")["species"])
+    d = pd.read_csv(DATASET)
+    d = d[d.iloc[:, 0].isin(species)]
 
-    for gene, lengths in mito_lengths.items():
-        avg_len = sum(lengths) / len(lengths)
-        rows.append((gene, round(avg_len, 1), len(lengths), "mito"))
+    records, no_pl, no_mt = [], [], []
+    for sp, _, pl, mt in d.iloc[:, :4].itertuples(index=False):
+        pl_dirs = [p for acc in str(pl).split(";") for p in accession_dirs("plastid_genes", acc)]
+        mt = str(mt)
+        if ";" in mt:
+            mt_dirs = species_dirs("mito_genes_merged", sp)
+        else:
+            mt_dirs = accession_dirs("mito_genes", mt) or species_dirs("mito_genes_merged", sp)
 
-    with open(OUTPUT, "w") as f:
-        f.write("gene\tlength_bp\tn_copies_averaged\tsource\n")
-        for gene, length, n, source in sorted(rows, key=lambda x: -x[2]):
-            f.write(f"{gene}\t{length}\t{n}\t{source}\n")
+        r_pl = gene_records(pl_dirs, sp, "plastid")
+        r_mt = gene_records(mt_dirs, sp, "mito")
+        if not r_pl:
+            no_pl.append(sp)
+        if not r_mt:
+            no_mt.append(sp)
+        records += r_pl + r_mt
 
-    print(f"Wrote {len(rows)} genes to {OUTPUT}")
-    print(f"  Plastid genes: {len(plastid_lengths)}")
-    print(f"  Mito genes: {len(mito_lengths)}")
-    print("\nSample rows:")
-    with open(OUTPUT) as f:
-        for i, line in enumerate(f):
-            if i > 10:
-                break
-            print(line.strip())
+    df = pd.DataFrame(records, columns=["species", "source", "gene", "length"])
+    per_sp = df.groupby(["source", "gene", "species"])["length"].mean().reset_index()
+    out = (per_sp.groupby(["source", "gene"])["length"]
+           .agg(length_bp="mean", median_bp="median", n_species="size")
+           .reset_index())
+    out["length_bp"] = out["length_bp"].round(1)
+    out["median_bp"] = out["median_bp"].round(1)
+    out = out.sort_values(["source", "n_species"], ascending=[False, False])
+    out[["gene", "source", "length_bp", "median_bp", "n_species"]].to_csv(
+        OUTPUT, sep="\t", index=False)
+
+    n_sp = len(d)
+    print(f"species in dataset: {n_sp}")
+    print(f"  with plastid genes: {n_sp - len(no_pl)}   with mito genes: {n_sp - len(no_mt)}")
+    print(f"genes: plastid {(out.source == 'plastid').sum()}, mito {(out.source == 'mito').sum()}")
+    shared = set(out.gene[out.source == "plastid"]) & set(out.gene[out.source == "mito"])
+    print(f"gene names present in both organelles: {len(shared)}")
+    print(f"wrote {OUTPUT}\n")
+
+    chk = out[out.gene.isin(CHECK_GENES)].pivot(index="gene", columns="source",
+                                                  values=["length_bp", "n_species"])
+    print("check genes (length_bp and n_species per organelle):")
+    print(chk.to_string())
 
 
 if __name__ == "__main__":
