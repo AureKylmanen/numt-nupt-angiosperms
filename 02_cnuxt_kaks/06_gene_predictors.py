@@ -19,14 +19,6 @@ Tests run per organelle:
                                             retention once length is
                                             accounted for?)
 
-Test 5 is the substantive one: gene length is expected to drive transfer
-simply because a longer gene is a larger target, so the question is
-whether genes that transfer more than their length predicts are also more
-often retained.
-
-Between organelles, correlations are compared with Fisher's r-to-z, which
-tests whether two independent correlation coefficients differ.
-
 Usage:
     python3 06_gene_predictors.py [--min-cnuxt 5] [--min-dcnuxt 3]
 """
