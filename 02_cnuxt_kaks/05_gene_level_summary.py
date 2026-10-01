@@ -28,8 +28,8 @@ import pandas as pd
 
 BASE = "/vol/storage/5T_disk/organelles"
 
-NUPT_ALL = os.path.join(BASE, "all_species_nupt_kaks.tsv")
-NUMT_ALL = os.path.join(BASE, "all_species_numt_kaks.tsv")
+NUPT_ALL = os.path.join(BASE, "all_species_nupt_kaks_fixed_combined.tsv")
+NUMT_ALL = os.path.join(BASE, "all_species_numt_kaks_fixed_combined.tsv")
 DCNUPT = "dcnupt_final_bh.tsv"
 DCNUMT = "dcnumt_final_bh.tsv"
 GENE_LENGTHS = "gene_lengths.tsv"
@@ -37,7 +37,15 @@ GENE_LENGTHS = "gene_lengths.tsv"
 GENE_SYNONYMS = {f"nd{i}": f"nad{i}" for i in range(1, 10)}
 GENE_SYNONYMS["nd4l"] = "nad4l"
 GENE_SYNONYMS["cytb"] = "cob"      # same gene under two standard names
+GENE_SYNONYMS["oxygenase large subunit"] = "rbcl"   # product-named rbcL file
 
+def normalize_gene_name(raw):
+    name = raw.lower()
+    # product-named files: "ribulose-1,5-bisphosphate carboxylase_oxygenase
+    # large subunit" (the "/" became "_") is rbcL
+    if name.endswith("oxygenase large subunit"):
+        return "rbcl"
+    return GENE_SYNONYMS.get(name, name)
 
 def extract_gene(seq_id):
     base = str(seq_id).replace(".mafft", "").replace("_REV", "")
@@ -121,14 +129,17 @@ def main():
         i = argv.index("--min-sel")
         min_sel = int(argv[i + 1])
 
-    gene_lengths = None
+    gene_lengths = gl_plastid = gl_mito = None
     if os.path.exists(GENE_LENGTHS):
         gl = pd.read_csv(GENE_LENGTHS, sep="\t")
         gl["gene"] = gl["gene"].str.lower().replace(GENE_SYNONYMS)
-        gene_lengths = gl.groupby("gene")["length_bp"].mean()
+        if "source" not in gl.columns:
+            raise SystemExit("gene_lengths.tsv lacks a source column; rerun build_gene_lengths.py")
+        gl_plastid = gl[gl.source == "plastid"].groupby("gene")["length_bp"].mean()
+        gl_mito = gl[gl.source == "mito"].groupby("gene")["length_bp"].mean()
 
-    nupt = summarise(NUPT_ALL, DCNUPT, "NUPT", gene_lengths)
-    numt = summarise(NUMT_ALL, DCNUMT, "NUMT", gene_lengths)
+    nupt = summarise(NUPT_ALL, DCNUPT, "NUPT", gl_plastid)
+    numt = summarise(NUMT_ALL, DCNUMT, "NUMT", gl_mito)
 
     for t, name in ((nupt, "NUPT"), (numt, "NUMT")):
         if t is None:
