@@ -506,7 +506,7 @@ def species_dirs(base, species):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base", default="/vol/storage/5T_disk/organelles")
+    ap.add_argument("--base", default=os.environ.get("BASE_DIR", os.getcwd()))
     ap.add_argument("--csv", default=None, help="default: <base>/combined_dataset.csv")
     ap.add_argument("--gff-dir", action="append", required=True,
                     help="repeat for each directory that may hold GFFs")

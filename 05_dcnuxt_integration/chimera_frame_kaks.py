@@ -233,7 +233,7 @@ def run_kaks(a_name, a_seq, b_name, b_seq, tag, workdir, kaks_bin):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base", default="/vol/storage/5T_disk/organelles")
+    ap.add_argument("--base", default=os.environ.get("BASE_DIR", os.getcwd()))
     ap.add_argument("--ref-species", required=True)
     ap.add_argument("--ref-chrom", required=True)
     ap.add_argument("--cds", action="append", required=True,

@@ -35,7 +35,7 @@
 
 set -euo pipefail
 
-BASE=/vol/storage/5T_disk/organelles
+BASE="${BASE_DIR:-$PWD}"
 LOCI="$BASE/dcnuxt_overlap_exon_cluster.tsv"
 THREADS=8
 MARGIN=10
