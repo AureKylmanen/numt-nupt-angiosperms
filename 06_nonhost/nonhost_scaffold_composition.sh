@@ -31,7 +31,7 @@
 # ============================================================
 set -uo pipefail
 
-BASE_DIR="${BASE_DIR:-/vol/storage/5T_disk/organelles}"
+BASE_DIR="${BASE_DIR:-$PWD}"
 CSV="$BASE_DIR/combined_dataset.csv"
 PLASTID_DB="/vol/storage/pt_database/plastid_db"
 MITO_DB="/vol/storage/mt_database/mito_db"

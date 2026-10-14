@@ -44,7 +44,8 @@ set -euo pipefail
 # CONFIG
 ############################################
 
-BASE_DIR="/vol/storage/5T_disk/organelles"
+BASE_DIR="${BASE_DIR:-$PWD}"   # working directory; override with BASE_DIR=...
+export BASE_DIR
 SP_DIR="$BASE_DIR/species"
 SPECIES_LIST="$BASE_DIR/combined_dataset.csv"        # SPECIES,ASSEMBLY,PLASTID,MITO
 
