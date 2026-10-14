@@ -1,9 +1,11 @@
 # common.R -- shared by 01_phylo_signal.R, 02_pgls_models.R, 03_plot_pgls_panels.R
 #
-# Data: insertion content per species, FASTA-derived nuclear genome size,
-# FASTA-derived organelle sizes (01_organelle_qc/02_organelle_lengths_from_fasta.py).
-# Species whose organelle file was flagged are removed from models of the
-# affected class only (NUPT flags -> NUPT models; NUMT flags -> NUMT models).
+# Data: insertion content and organelle sizes per species from
+# final_species_summary_v2.tsv (01_detection/build_species_summary.py); nuclear
+# genome size from the genome FASTA (tree/assembly_stats.tsv,
+# 00_data/make_assembly_stats.py) where available.
+# Parasitic species with reduced plastomes are flagged (genus list below) for
+# the plastid-size model without parasites.
 #
 # Fitting: lambda profiled on a grid (corPagel(fixed = FALSE) fails to
 # converge for several models); report fit at ML lambda with a 95% profile
@@ -18,9 +20,10 @@ OUT  <- Sys.getenv("NUXT_OUT",  file.path(BASE, "pgls_v2"))
 dir.create(OUT, showWarnings = FALSE, recursive = TRUE)
 
 TREE_F  <- file.path(BASE, "tree/species_names_grafted.nwk")
-SUMM_F  <- file.path(BASE, "final_species_summary_v2.tsv")   # 02_summaries/01
+SUMM_F  <- file.path(BASE, "final_species_summary_v2.tsv")
 STATS_F <- file.path(BASE, "tree/assembly_stats.tsv")
-ORG_F   <- file.path(OUT,  "organelle_lengths_final.tsv")
+PARASITE_GENERA <- c("Cuscuta", "Orobanche", "Phelipanche", "Aeginetia",
+                     "Epifagus", "Striga", "Rafflesia", "Sapria")
 
 GRID <- seq(0, 1, by = 0.02)
 
@@ -37,22 +40,13 @@ extend_ultrametric <- function(tr) {
 
 load_data <- function() {
   tree <- read.tree(TREE_F)
-  # only the columns the models need; organelle sizes come from ORG_F below
-  summ <- read.delim(SUMM_F, stringsAsFactors = FALSE)[
-    , c("species", "genome_size", "numt_merged_prop", "nupt_merged_prop")]
-  org  <- read.delim(ORG_F,  stringsAsFactors = FALSE, na.strings = "NA") %>%
-    transmute(species,
-              mito_length    = suppressWarnings(as.numeric(mito_len)),
-              plastid_length = suppressWarnings(as.numeric(plastid_len)),
-              exclude_numt = exclude_numt == 1,
-              exclude_nupt = exclude_nupt == 1,
-              parasite     = parasite == 1)
-
-  df <- summ %>%
+  df <- read.delim(SUMM_F, stringsAsFactors = FALSE)[
+    , c("species", "genome_size", "numt_merged_prop", "nupt_merged_prop",
+        "mito_length", "plastid_length")] %>%
     filter(!is.na(genome_size), !is.na(numt_merged_prop), !is.na(nupt_merged_prop)) %>%
-    left_join(org, by = "species") %>%
-    # insertion bp are independent of which genome size is used
-    mutate(numt_bp = numt_merged_prop * genome_size,
+    mutate(parasite = sub("_.*", "", species) %in% PARASITE_GENERA,
+           # insertion bp are independent of which genome size is used
+           numt_bp = numt_merged_prop * genome_size,
            nupt_bp = nupt_merged_prop * genome_size)
 
   # FASTA-derived genome size where available (fixes truncated Hordeum etc.)
@@ -62,16 +56,7 @@ load_data <- function() {
       mutate(genome_size = ifelse(!is.na(total_bp), total_bp, genome_size))
   }
 
-  missing_org <- setdiff(df$species, org$species)
-  if (length(missing_org))
-    cat("WARNING:", length(missing_org),
-        "species have no row in organelle_lengths_final.tsv (treated as NA):\n ",
-        paste(head(missing_org, 20), collapse = ", "), "\n")
-
   df <- df %>% mutate(
-    exclude_numt = coalesce(exclude_numt, TRUE),
-    exclude_nupt = coalesce(exclude_nupt, TRUE),
-    parasite     = coalesce(parasite, FALSE),
     numt_merged_prop = numt_bp / genome_size,
     nupt_merged_prop = nupt_bp / genome_size,
     log_genome  = log10(genome_size / 1e6),        # Mbp
@@ -82,21 +67,13 @@ load_data <- function() {
     log_numt_bp   = log10(numt_bp),
     log_nupt_bp   = log10(nupt_bp))
 
-  # flagged organelles -> NA for that class only
-  df <- df %>% mutate(
-    across(c(log_numt_prop, log_numt_bp, log_mito),
-           ~ ifelse(exclude_numt, NA, .x)),
-    across(c(log_nupt_prop, log_nupt_bp, log_plastid),
-           ~ ifelse(exclude_nupt, NA, .x)))
-
   overlap <- intersect(tree$tip.label, df$species)
   tr <- keep.tip(tree, overlap)
   tr$edge.length[tr$edge.length < 0] <- 0
   if (!is.ultrametric(tr)) tr <- extend_ultrametric(tr)
   df <- df[match(tr$tip.label, df$species), ]
   rownames(df) <- df$species
-  cat(sprintf("species in tree and data: %d  (NUMT-excluded %d, NUPT-excluded %d)\n",
-              nrow(df), sum(df$exclude_numt), sum(df$exclude_nupt)))
+  cat(sprintf("species in tree and data: %d  (parasites %d)\n", nrow(df), sum(df$parasite)))
   list(df = df, tree = tr)
 }
 

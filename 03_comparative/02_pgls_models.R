@@ -3,14 +3,11 @@
 #
 #   Rscript 02_pgls_models.R
 #
-# Needs organelle_lengths_final.tsv
-# and final_species_summary_v2.tsv
-# in $NUXT_OUT (default /vol/storage/5T_disk/organelles/pgls_v2).
-# Writes to $NUXT_OUT:
+# Reads final_species_summary_v2.tsv, tree/ (see common.R).
+# Writes to $NUXT_OUT (default <base>/pgls_v2):
 #   pgls_table.tsv        one row per model term (Supplemental Table, tab:pgls)
 #   lambda_profiles.tsv   slope and P at every lambda (Supplemental Table S4)
 #   pgls_fits.rds         fitted objects, read by 03_plot_pgls_panels.R
-#   excluded_species.tsv  who was dropped from which class and why
 
 args <- commandArgs(trailingOnly = FALSE)
 here <- dirname(normalizePath(sub("--file=", "", args[grep("--file=", args)])))
@@ -58,10 +55,6 @@ write.table(tab,  file.path(OUT, "pgls_table.tsv"),      sep = "\t", quote = FAL
 write.table(prof, file.path(OUT, "lambda_profiles.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
 saveRDS(fits, file.path(OUT, "pgls_fits.rds"))
 
-excl <- df[df$exclude_numt | df$exclude_nupt,
-           c("species", "exclude_numt", "exclude_nupt", "mito_length", "plastid_length")]
-write.table(excl, file.path(OUT, "excluded_species.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
-
 fmtP <- function(p) ifelse(p < 0.001, formatC(p, format = "e", digits = 1), sprintf("%.3f", p))
 cat("\n===== PGLS at ML lambda (95% profile CI) | OLS =====\n")
 for (i in seq_len(nrow(tab))) with(tab[i, ], cat(sprintf(
@@ -70,4 +63,3 @@ for (i in seq_len(nrow(tab))) with(tab[i, ], cat(sprintf(
   slope, SE, fmtP(P), fmtP(P_vs_1), OLS_slope, fmtP(OLS_P), robust_to_lambda)))
 cat("\n* lambda estimate on the 0/1 boundary\n")
 cat("P(b=1) is only meaningful for bp ~ size models (test of isometry).\n")
-cat("Excluded species written to excluded_species.tsv\n")

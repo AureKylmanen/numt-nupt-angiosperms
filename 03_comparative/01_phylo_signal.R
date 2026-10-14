@@ -13,8 +13,8 @@
 #   and against lambda = 1 (Brownian motion; geiger::fitContinuous, lambda vs BM)
 #
 # Writes to $NUXT_OUT: phylo_signal_table.tsv
-# The BayesTraits variable-rates comparison (log BF columns of that table) is
-# produced by the separate BayesTraits scripts and is not recomputed here.
+# Run with OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 exported in the shell:
+# fitContinuous forks, and forked R with multi-threaded BLAS can deadlock.
 
 args <- commandArgs(trailingOnly = FALSE)
 here <- dirname(normalizePath(sub("--file=", "", args[grep("--file=", args)])))

@@ -24,8 +24,8 @@ suppressPackageStartupMessages({
 })
 
 args  <- commandArgs(trailingOnly = TRUE)
-f_sum <- if (length(args) >= 1) args[1] else "final_species_summary.tsv"
-f_asm <- if (length(args) >= 2) args[2] else "assembly_stats.tsv"
+f_sum <- if (length(args) >= 1) args[1] else "final_species_summary_v2.tsv"
+f_asm <- if (length(args) >= 2) args[2] else "assembly_technology.tsv"
 f_tre <- if (length(args) >= 3) args[3] else "/vol/storage/5T_disk/organelles/tree/species_names_grafted.nwk"
 f_met <- if (length(args) >= 4) args[4] else "insertion_metrics.tsv"
 outd  <- if (length(args) >= 5) args[5] else "tech_effect"
