@@ -365,6 +365,22 @@ def match_fragment(seq_id, keys, bed_map):
     return None
 
 
+def norm_id(q):
+    return re.sub(r"\.mafft$", "", str(q).strip())
+
+
+def load_final_set(path):
+    """(species, sequence ID) pairs of the final unique dcNUxT set."""
+    with open(path, newline="") as fh:
+        rd = csv.DictReader(fh, delimiter="\t")
+        cols = {c.lower(): c for c in rd.fieldnames or []}
+        sc = cols.get("species")
+        ic = next((cols[c] for c in ("sequence", "seq_id", "id") if c in cols), None)
+        if not (sc and ic):
+            raise SystemExit(f"{path}: needs a species column and a sequence/seq_id/id column")
+        return {(r[sc], norm_id(r[ic])) for r in rd}
+
+
 def read_kaks(path, min_ks):
     sep = sniff_table(path)
     out = []
@@ -441,19 +457,27 @@ def classify(idx, chrom, start, end, min_frac):
 
 def permute(idx, loci, seqlen, nperm, min_frac, rng):
     """Shuffle each locus uniformly within its own scaffold, controlling for
-    the strong scaffold bias in NUxT density."""
-    acc = Counter()
-    usable = [(c, s, e) for (c, s, e) in loci if seqlen.get(c, 0) > (e - s) + 1]
+    the strong scaffold bias in NUxT density.
+
+    Returns per-replicate counts, not just the mean, so an empirical p-value
+    can be computed. Only loci on scaffolds of known length longer than the
+    locus can be placed (permutable(); the observed counts use the same loci)."""
+    usable = [(c, s, e) for (c, s, e) in loci if permutable(seqlen, c, s, e)]
     if not usable:
-        return acc, 0
+        return [], 0
+    reps = []
     for _ in range(nperm):
+        c1 = Counter()
         for chrom, s, e in usable:
             L = e - s
             ns = rng.randrange(0, seqlen[chrom] - L)
-            acc[classify(idx, chrom, ns, ns + L, min_frac)["class_strict"]] += 1
-    for k in list(acc):
-        acc[k] /= nperm
-    return acc, len(usable)
+            c1[classify(idx, chrom, ns, ns + L, min_frac)["class_strict"]] += 1
+        reps.append(c1)
+    return reps, len(usable)
+
+
+def permutable(seqlen, chrom, start, end):
+    return seqlen.get(chrom, 0) > (end - start) + 1
 
 
 # --------------------------------------------------------------------------
@@ -492,15 +516,35 @@ def main():
     ap.add_argument("--perms", type=int, default=1000)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--out-prefix", default="dcnuxt_overlap")
+    ap.add_argument("--final-set", default=None,
+                    help="TSV of the final unique dcNUxTs (species + sequence ID columns, "
+                         "e.g. dcnuxt_unique.tsv); only these Ka/Ks rows are analysed")
+    ap.add_argument("--exclude-organellar", default=None,
+                    help="<prefix>_exon_cluster.tsv from dcnuxt_exon_cluster.py: loci on "
+                         "scaffolds with verdict ORGANELLAR_CONTIG are left out (sensitivity test)")
     ap.add_argument("--audit-only", action="store_true")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
     csv_path = args.csv or os.path.join(args.base, "combined_dataset.csv")
     rng = random.Random(args.seed)
+    final = load_final_set(args.final_set) if args.final_set else None
+    if final is not None:
+        print(f"Final dcNUxT set: {len(final)} sequences from {args.final_set}")
+    excl_scaf = set()
+    if args.exclude_organellar:
+        with open(args.exclude_organellar, newline="") as fh:
+            for r in csv.DictReader(fh, delimiter="\t"):
+                if r.get("verdict") == "ORGANELLAR_CONTIG":
+                    excl_scaf.add((r["species"], r["chrom"]))
+        print(f"Excluding loci on {len(excl_scaf)} scaffolds with organellar genes")
+    n_excl_org = 0
 
     rows, audit = [], []
-    obs, exp = defaultdict(Counter), defaultdict(Counter)
+    obs = defaultdict(Counter)          # observed classes of permutable loci
+    exp = defaultdict(Counter)          # mean of the permuted replicates
+    perm_reps = defaultdict(list)       # kind -> one Counter per replicate, pooled over species
+    n_not_permuted = Counter()
     unmatched_total = Counter()
 
     with open(csv_path, newline="", errors="replace") as fh:
@@ -542,6 +586,8 @@ def main():
                         break
                 if used:
                     tables_found.add(kind)
+                if final is not None:
+                    hits = [h for h in hits if (species, norm_id(h["Sequence"])) in final]
                 if not hits:
                     continue
 
@@ -552,6 +598,9 @@ def main():
                         unmatched += 1
                         continue
                     chrom, start, end, gene = m
+                    if (species, chrom) in excl_scaf:
+                        n_excl_org += 1
+                        continue
                     key = (chrom, start, end, gene)   # collapse duplicate HSP intervals
                     if key in seen:
                         continue
@@ -617,7 +666,12 @@ def main():
                 loci = []
                 for r in recs:
                     res = classify(idx, r["chrom"], r["start"], r["end"], args.min_frac)
-                    obs[kind][res["class_strict"]] += 1
+                    # observed and expected counts must cover the same loci: count
+                    # only loci that permute() can place
+                    if args.perms and permutable(seqlen, r["chrom"], r["start"], r["end"]):
+                        obs[kind][res["class_strict"]] += 1
+                    else:
+                        n_not_permuted[kind] += 1
                     loci.append((r["chrom"], r["start"], r["end"]))
                     rows.append([
                         species, kind, r["gene"], r["chrom"], r["start"], r["end"],
@@ -630,9 +684,14 @@ def main():
                         seqlen.get(r["chrom"], ""), os.path.basename(gff),
                     ])
                 if args.perms and seqlen:
-                    e, _n = permute(idx, loci, seqlen, args.perms, args.min_frac, rng)
-                    for k, v in e.items():
-                        exp[kind][k] += v
+                    reps, _n = permute(idx, loci, seqlen, args.perms, args.min_frac, rng)
+                    if reps:
+                        if not perm_reps[kind]:
+                            perm_reps[kind] = [Counter() for _ in range(len(reps))]
+                        for i, c1 in enumerate(reps):
+                            perm_reps[kind][i].update(c1)
+                        for k in set().union(*reps):
+                            exp[kind][k] += sum(c[k] for c in reps) / len(reps)
 
     # ---- write ---------------------------------------------------------
     with open(args.out_prefix + "_gff_audit.tsv", "w") as fh:
@@ -669,28 +728,52 @@ def main():
             fh.write("\t".join(map(str, r)) + "\n")
 
     order = ("CDS", "UTR_exon", "intronic", "pseudogene", "intergenic")
+
+    def perm_stats(kind, cls):
+        """mean, SD and two-sided empirical P of the pooled permutation replicates"""
+        o = obs[kind][cls]
+        vals = [c[cls] for c in perm_reps.get(kind, [])]
+        if not vals:
+            return None
+        mu = sum(vals) / len(vals)
+        sd = (sum((v - mu) ** 2 for v in vals) / len(vals)) ** 0.5
+        ge = sum(1 for v in vals if v >= o)
+        le = sum(1 for v in vals if v <= o)
+        pv = min(1.0, 2 * (min(ge, le) + 1) / (len(vals) + 1))
+        return mu, sd, pv, len(vals)
+
     with open(args.out_prefix + "_summary.tsv", "w") as fh:
-        fh.write("kind\tclass\tobserved\tpct\texpected_perm\tobs_over_exp\n")
+        fh.write("kind\tclass\tobserved\tpct\texpected_perm\tperm_sd\tobs_over_exp\tp_two_sided\tn_perm\n")
         for kind in ("NUPT", "NUMT"):
             tot = sum(obs[kind].values())
             if not tot:
                 continue
             for cls in order:
-                o, e = obs[kind][cls], exp[kind].get(cls, 0.0)
-                oe = f"{o / e:.2f}" if e > 0 else "NA"
-                fh.write(f"{kind}\t{cls}\t{o}\t{100 * o / tot:.1f}\t{e:.1f}\t{oe}\n")
-            fh.write(f"{kind}\tTOTAL\t{tot}\t100.0\t\t\n")
+                o, st = obs[kind][cls], perm_stats(kind, cls)
+                if st:
+                    mu, sd, pv, n = st
+                    oe = f"{o / mu:.2f}" if mu > 0 else "NA"
+                    fh.write(f"{kind}\t{cls}\t{o}\t{100 * o / tot:.1f}\t{mu:.1f}\t{sd:.1f}\t{oe}\t{pv:.4f}\t{n}\n")
+                else:
+                    fh.write(f"{kind}\t{cls}\t{o}\t{100 * o / tot:.1f}\tNA\tNA\tNA\tNA\t0\n")
+            fh.write(f"{kind}\tTOTAL\t{tot}\t100.0\t\t\t\t\t\n")
 
     for kind in ("NUPT", "NUMT"):
         tot = sum(obs[kind].values())
         if not tot:
             continue
-        print(f"\n{kind}  n={tot}")
+        print(f"\n{kind}  n={tot} permuted loci ({n_not_permuted[kind]} loci without a usable scaffold length: classified, not tested)")
         for cls in order:
-            o, e = obs[kind][cls], exp[kind].get(cls, 0.0)
-            oe = f"   o/e {o / e:.2f}" if e > 0 else ""
-            print(f"  {cls:12s} obs {o:5d} ({100 * o / tot:5.1f}%)   exp {e:7.1f}{oe}")
+            o, st = obs[kind][cls], perm_stats(kind, cls)
+            if st:
+                mu, sd, pv, _ = st
+                oe = f"{o / mu:.2f}" if mu > 0 else "NA"
+                print(f"  {cls:12s} obs {o:5d} ({100 * o / tot:5.1f}%)   exp {mu:7.1f} +/- {sd:.1f}   o/e {oe}   p={pv:.4f}")
+            else:
+                print(f"  {cls:12s} obs {o:5d} ({100 * o / tot:5.1f}%)")
 
+    if excl_scaf:
+        print(f"\nLoci excluded on scaffolds with organellar genes: {n_excl_org}")
     print(f"\nWrote {args.out_prefix}_loci.tsv, _summary.tsv, _gff_audit.tsv")
 
 

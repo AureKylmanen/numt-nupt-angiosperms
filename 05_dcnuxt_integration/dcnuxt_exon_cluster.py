@@ -24,7 +24,7 @@ What it reports per locus
                      (atpA -> "ATP synthase alpha", nad3 -> "NADH ...").
                      Homology-driven annotation, not independent evidence.
   verdict            CANDIDATE / CIRCULAR / SINGLE_EXON / INTRONIC_ONLY /
-                     ORGANELLAR_CONTIG
+                     PSEUDOGENE / NO_GENE_STRUCTURE / ORGANELLAR_CONTIG
 
 Usage
 -----
@@ -45,7 +45,7 @@ import os
 import re
 import subprocess
 import sys
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 # scaffolds below this are treated as probable unplaced organellar contigs
 ORGANELLAR_SCAFFOLD_MAX = 200_000
@@ -121,6 +121,7 @@ def load_gene_models(gff_path, wanted_seqids):
     locus_tag= from exon lines, which leaves the label empty."""
     genes = {}
     tx2gene = {}
+    cds_by_gene = defaultdict(list)
 
     with smart_open(gff_path) as fh:
         for line in fh:
@@ -147,20 +148,24 @@ def load_gene_models(gff_path, wanted_seqids):
                     "type": ftype, "product": ".",
                     "tx": defaultdict(list),
                 }
-            elif ftype in ("mRNA", "transcript", "lnc_RNA", "ncRNA",
-                           "primary_transcript"):
+            elif ftype.endswith("RNA") or ftype in ("transcript", "primary_transcript",
+                                                    "mRNA", "V_gene_segment"):
                 if parent and fid and parent.group(1) in genes:
                     tx2gene[fid.group(1)] = parent.group(1)
                     if product and genes[parent.group(1)]["product"] == ".":
                         genes[parent.group(1)]["product"] = product.group(1)
             elif ftype == "CDS":
-                if parent and product:
+                if parent:
                     for p in parent.group(1).split(","):
-                        g = tx2gene.get(p)
-                        if g and genes[g]["product"] == ".":
-                            genes[g]["product"] = product.group(1)
+                        g = tx2gene.get(p) or (p if p in genes else None)
+                        if g:
+                            cds_by_gene[g].append((int(f[3]) - 1, int(f[4])))
+                            if product and genes[g]["product"] == ".":
+                                genes[g]["product"] = product.group(1)
 
-    # second pass for exons (Parent can precede the mRNA line)
+    # second pass for exons. Parent may point at a transcript OR directly at
+    # the gene (e.g. "Parent=gene-ERUC_LOCUS56;gbkey=exon"), and may precede
+    # the line it refers to.
     with smart_open(gff_path) as fh:
         for line in fh:
             if line.startswith("#"):
@@ -172,9 +177,19 @@ def load_gene_models(gff_path, wanted_seqids):
             if not parent:
                 continue
             for p in parent.group(1).split(","):
-                g = tx2gene.get(p)
+                g = tx2gene.get(p) or (p if p in genes else None)
                 if g:
                     genes[g]["tx"][p].append((int(f[3]) - 1, int(f[4])))
+
+    # genes with no exon lines at all: use CDS segments as the exon proxy.
+    # n_exons==0 then means "no structure in the GFF", which is recorded
+    # separately rather than silently treated as a single-exon gene.
+    for gid, g in genes.items():
+        if not g["tx"] and cds_by_gene.get(gid):
+            g["tx"]["_cds"] = sorted(set(cds_by_gene[gid]))
+            g["exon_source"] = "CDS"
+        else:
+            g["exon_source"] = "exon" if g["tx"] else "none"
 
     by_seqid = defaultdict(list)
     for g in genes.values():
@@ -201,8 +216,29 @@ def main():
     ap.add_argument("--genome-dir", action="append", default=[])
     ap.add_argument("--flank", type=int, default=0,
                     help="bp of flanking sequence to extract for RNA validation")
+    ap.add_argument("--targets", default="CANDIDATE",
+                    help="comma-separated verdicts to extract flanked sequence "
+                         "for, or 'all'. Transcription is an empirical question "
+                         "independent of annotation quality: pseudogene, intronic "
+                         "and circular loci can all be transcribed, so widen this "
+                         "rather than pre-judging on the verdict.")
+    ap.add_argument("--exclude-scaffolds", default=None,
+                    help="file of scaffold IDs verified as organellar contigs")
     ap.add_argument("--out-prefix", default="dcnuxt_overlap")
     args = ap.parse_args()
+
+    ALL_VERDICTS = {"CANDIDATE","INTRONIC_ONLY","SINGLE_EXON","CIRCULAR","PSEUDOGENE","ORGANELLAR_CONTIG","NO_GENE_STRUCTURE"}
+    targets = (ALL_VERDICTS if args.targets.strip().lower() == "all"
+               else {t.strip().upper() for t in args.targets.split(",") if t.strip()})
+    unknown = targets - ALL_VERDICTS
+    if unknown:
+        sys.exit(f"unknown verdict(s) in --targets: {', '.join(sorted(unknown))}\n"
+                 f"choose from: {', '.join(sorted(ALL_VERDICTS))}, or 'all'")
+
+    excluded = set()
+    if args.exclude_scaffolds and os.path.exists(args.exclude_scaffolds):
+        with open(args.exclude_scaffolds) as fh:
+            excluded = {ln.split()[0] for ln in fh if ln.strip()}
 
     asm = {}
     with open(args.csv, newline="", errors="replace") as fh:
@@ -232,6 +268,7 @@ def main():
 
         wanted_seqids = {r["chrom"] for r in rows}
         by_seqid = load_gene_models(gff, wanted_seqids)
+        pending = []
 
         for r in rows:
             start, end = int(r["start"]), int(r["end"])
@@ -258,40 +295,64 @@ def main():
             hits_exon = exon_bp > 0
             dlike = donor_like(r["gene"], host, product)
             generic = any(x in product.lower() for x in GENERIC)
+            exon_src = g.get("exon_source", "none") if g else "none"
 
-            if scaf and scaf < ORGANELLAR_SCAFFOLD_MAX:
+            pending.append({
+                "row": r, "start": start, "end": end, "L": L, "scaf": scaf,
+                "host": host, "gtype": gtype, "product": product,
+                "n_exons": n_exons, "hits_exon": hits_exon, "exon_bp": exon_bp,
+                "gene_span": gene_span, "frac": frac, "exon_src": exon_src,
+                "dlike": dlike, "generic": generic,
+            })
+
+        # Organellar evidence is a property of the scaffold, not the locus.
+        # Stylosanthes scaffold 46011 carries both a "hypothetical protein"
+        # host and RPOC1_1 (plastid RNA polymerase): the plastid gene name
+        # condemns the whole contig, so propagate it.
+        organellar_scaf = {p["row"]["chrom"] for p in pending
+                           if p["dlike"] and p["scaf"]
+                           and p["scaf"] < ORGANELLAR_SCAFFOLD_MAX}
+
+        for p in pending:
+            r = p["row"]
+            if r["chrom"] in excluded or r["chrom"] in organellar_scaf:
                 verdict = "ORGANELLAR_CONTIG"
-            elif dlike:
+            elif p["gtype"] == "pseudogene":
+                verdict = "PSEUDOGENE"
+            elif p["dlike"]:
                 verdict = "CIRCULAR"
-            elif n_exons <= 1:
+            elif p["exon_src"] == "none":
+                verdict = "NO_GENE_STRUCTURE"
+            elif p["n_exons"] <= 1:
                 verdict = "SINGLE_EXON"
-            elif not hits_exon:
+            elif not p["hits_exon"]:
                 verdict = "INTRONIC_ONLY"
-            elif frac > 0.8:
+            elif p["frac"] > 0.8:
                 verdict = "CIRCULAR"
             else:
                 verdict = "CANDIDATE"
 
             out_rows.append([
-                species, r["kind"], r["gene"], r["chrom"], start, end, L,
+                species, r["kind"], r["gene"], r["chrom"], p["start"], p["end"], p["L"],
                 r["Ks"], r["KaKs"], r["P"], r["class_strict"],
-                host, gtype, product, n_exons,
-                "yes" if hits_exon else "no", exon_bp,
-                gene_span, f"{frac:.3f}",
-                "yes" if dlike else "no", "yes" if generic else "no",
-                scaf, verdict,
+                p["host"], p["gtype"], p["product"], p["n_exons"],
+                "yes" if p["hits_exon"] else "no", p["exon_bp"],
+                p["gene_span"], f'{p["frac"]:.3f}', p["exon_src"],
+                "yes" if p["dlike"] else "no", "yes" if p["generic"] else "no",
+                p["scaf"], verdict,
             ])
 
-            if verdict == "CANDIDATE":
-                fs = max(0, start - args.flank)
-                bed_rows.append([species, r["chrom"], fs, end + args.flank,
-                                 f"{species}|{r['gene']}|{r['feature']}", start, end])
+            if verdict in targets:
+                fs = max(0, p["start"] - args.flank)
+                bed_rows.append([species, r["chrom"], fs, p["end"] + args.flank,
+                                 f'{species}|{r["kind"]}|{r["gene"]}|{p["host"]}|{verdict}',
+                                 p["start"], p["end"]])
 
     hdr = ["species", "kind", "donor_gene", "chrom", "start", "end", "len",
            "Ks", "KaKs", "P", "class", "host_gene", "host_type", "host_product",
            "n_exons", "hits_exon", "exon_overlap_bp", "gene_span",
-           "frac_gene_is_nuxt", "donor_like_annotation", "generic_product",
-           "scaffold_len", "verdict"]
+           "frac_gene_is_nuxt", "exon_source", "donor_like_annotation",
+           "generic_product", "scaffold_len", "verdict"]
     with open(args.out_prefix + "_exon_cluster.tsv", "w") as fh:
         fh.write("\t".join(hdr) + "\n")
         for r in out_rows:
@@ -301,31 +362,55 @@ def main():
         for sp, chrom, s, e, name, ts, te in bed_rows:
             fh.write(f"{chrom}\t{s}\t{e}\t{name}\t0\t+\n")
 
-    # optional sequence extraction for junction-spanning read checks
+    # optional sequence extraction for junction-spanning read checks.
+    # Reads that fall wholly inside the insertion are ambiguous with the
+    # organellar transcript; only reads crossing insertion<->flank are
+    # informative, which is what the flanks are for.
     if args.flank and args.genome_dir:
-        written = 0
+        written, skipped = 0, Counter()
+        gen_cache = {}
         with open(args.out_prefix + "_rna_targets.fa", "w") as out:
-            for sp, chrom, s, e, name, ts, te in bed_rows:
+            for sp, chrom, s0, e0, name, ts, te in bed_rows:
                 a = asm.get(sp)
-                gen = find_one(args.genome_dir, a,
-                               ["{acc}_*_genomic.fna", "{acc}_genomic.fna",
-                                "{acc}_*_genomic.fna.gz"]) if a else None
-                if not gen or gen.endswith(".gz"):
+                if a not in gen_cache:
+                    gen_cache[a] = find_one(
+                        args.genome_dir, a,
+                        ["{acc}_*_genomic.fna", "{acc}_genomic.fna",
+                         "{acc}_*_genomic.fna.gz"]) if a else None
+                gen = gen_cache[a]
+                if not gen:
+                    skipped["no_genome_fasta"] += 1
+                    continue
+                if gen.endswith(".gz"):
+                    skipped["genome_gzipped"] += 1
                     continue
                 if not os.path.exists(gen + ".fai"):
-                    continue
+                    try:
+                        subprocess.run(["samtools", "faidx", gen],
+                                       capture_output=True, check=True)
+                    except (subprocess.CalledProcessError, FileNotFoundError):
+                        skipped["faidx_failed"] += 1
+                        continue
                 try:
-                    seq = subprocess.run(
-                        ["samtools", "faidx", gen, f"{chrom}:{s+1}-{e}"],
+                    res = subprocess.run(
+                        ["samtools", "faidx", gen, f"{chrom}:{s0+1}-{e0}"],
                         capture_output=True, text=True, check=True).stdout
                 except (subprocess.CalledProcessError, FileNotFoundError):
+                    skipped["faidx_region_failed"] += 1
                     continue
-                body = "".join(seq.split("\n")[1:])
-                out.write(f">{name} {chrom}:{s+1}-{e} insert={ts}-{te}\n{body}\n")
+                body = "".join(res.split("\n")[1:])
+                if not body:
+                    skipped["empty_region"] += 1
+                    continue
+                # offsets of the two junctions within the extracted sequence
+                j1, j2 = ts - s0, te - s0
+                out.write(f">{name} {chrom}:{s0+1}-{e0} insert={ts}-{te} "
+                          f"junctions={j1},{j2}\n{body}\n")
                 written += 1
         print(f"extracted {written} flanked sequences")
+        for k, n in skipped.most_common():
+            print(f"  skipped ({k}): {n}")
 
-    from collections import Counter
     v = Counter(r[-1] for r in out_rows)
     print(f"\n{len(out_rows)} dcNUxT loci inside an annotated gene")
     for k, n in v.most_common():
