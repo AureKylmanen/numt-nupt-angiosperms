@@ -21,7 +21,7 @@ Usage:
 import os
 import sys
 
-BASE = sys.argv[1] if len(sys.argv) > 1 else "/vol/storage/5T_disk/organelles"
+BASE = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("BASE_DIR", os.getcwd())
 OUT = sys.argv[2] if len(sys.argv) > 2 else "insertion_metrics.tsv"
 MIN_LEN = 200            # same as numt_nupt_detection.sh
 MERGE = 10000

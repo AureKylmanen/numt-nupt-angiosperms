@@ -23,7 +23,7 @@
 
 suppressPackageStartupMessages({ library(ape); library(nlme); library(ggplot2) })
 
-BASE    <- Sys.getenv("BASE", "/vol/storage/5T_disk/organelles")
+BASE    <- Sys.getenv("BASE_DIR", getwd())
 SUMMARY <- file.path(BASE, "final_species_summary_v2.tsv")
 MTPT    <- file.path(BASE, "species/mtpt_coverage.tsv")
 TREE    <- file.path(BASE, "tree/species_names_grafted.nwk")

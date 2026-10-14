@@ -19,7 +19,7 @@ suppressPackageStartupMessages({
   library(ape); library(phytools); library(nlme)
 })
 
-BASE <- Sys.getenv("NUXT_BASE", "/vol/storage/5T_disk/organelles")
+BASE <- Sys.getenv("NUXT_BASE", Sys.getenv("BASE_DIR", getwd()))
 DIR  <- file.path(BASE, "tree")
 QC   <- file.path(DIR, "assembly_stats.tsv")
 

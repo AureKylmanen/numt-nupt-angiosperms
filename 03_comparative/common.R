@@ -15,7 +15,7 @@ suppressPackageStartupMessages({
   library(ape); library(nlme); library(dplyr)
 })
 
-BASE <- Sys.getenv("NUXT_BASE", "/vol/storage/5T_disk/organelles")
+BASE <- Sys.getenv("NUXT_BASE", Sys.getenv("BASE_DIR", getwd()))
 OUT  <- Sys.getenv("NUXT_OUT",  file.path(BASE, "pgls_v2"))
 dir.create(OUT, showWarnings = FALSE, recursive = TRUE)
 

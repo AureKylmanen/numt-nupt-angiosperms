@@ -36,7 +36,7 @@ import sys
 import glob
 from collections import defaultdict, Counter
 
-BASE = "/vol/storage/5T_disk/organelles"
+BASE = os.environ.get("BASE_DIR", os.getcwd())
 GENOME_DIRS = [
     f"{BASE}/downloads/genome_fasta",
     f"{BASE}/multi_organelles/downloads/genome_fasta",
