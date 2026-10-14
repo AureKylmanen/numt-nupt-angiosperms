@@ -86,11 +86,13 @@ for cls in ("nupt", "numt"):
     tot = collections.Counter()
     bysp = collections.Counter()
     leftover = []
+    n_found = 0
     for sp in species:
         path = f"species/{sp}/results/{sp}_{cls}_kaks.csv"
         src = path + SUF if os.path.isfile(path + SUF) else path
         if not os.path.isfile(src):
             continue
+        n_found += 1
         t = pd.read_csv(src, sep="\t", dtype=str, keep_default_na=False)
         if t.empty:
             continue
@@ -163,6 +165,9 @@ for cls in ("nupt", "numt"):
             t.iloc[kept].to_csv(path, sep="\t", index=False)
             os.utime(path, (st.st_atime, st.st_mtime))
     print(f"\n== {cls.upper()} {'(applied)' if APPLY else '(dry run)'}")
+    print(f"  Ka/Ks tables found   {n_found} of {len(species)} species")
+    if not n_found:
+        print(f"  WARNING: no species/<SP>/results/<SP>_{cls}_kaks.csv; run 01_{cls}_gene_alignment.sh first")
     print(f"  all rows        {tot['rows']:>6} -> {tot['rows_after']}")
     print(f"  coding (Ks ok)  {tot['coding']:>6} -> {tot['coding_after']}")
     print(f"  dcNUxT (Ks>0.1) {tot['dc']:>6} -> {tot['dc_after']}")

@@ -31,7 +31,7 @@ import re
 import sys
 import pandas as pd
 
-BASE = "/vol/storage/5T_disk/organelles"
+BASE = os.environ.get("BASE_DIR", os.getcwd())
 
 NUPT_ALL = os.path.join(BASE, "all_species_nupt_kaks.tsv")
 NUMT_ALL = os.path.join(BASE, "all_species_numt_kaks.tsv")

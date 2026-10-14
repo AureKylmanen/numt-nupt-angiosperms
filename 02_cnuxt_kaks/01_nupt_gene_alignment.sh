@@ -14,7 +14,8 @@ IFS=$'\n\t'
 # CONFIGURATION
 ############################################################
 
-BASE_DIR="/vol/storage/5T_disk/organelles"
+BASE_DIR="${BASE_DIR:-$PWD}"   # working directory; override with BASE_DIR=...
+export BASE_DIR
 SPECIES_LIST="$1"         # CSV: SPECIES,ASSEMBLY,PLASTID,MITO
 
 THREADS=12                # max concurrent fragment/gene align jobs
@@ -267,6 +268,7 @@ make_plastid_db() {
     # collect only NON-empty fasta files
     local files=()
     for f in "$plastid_dir"/*.fasta; do
+        [[ "$(basename "$f")" == all_* ]] && continue      # our own concatenation
         [[ -f "$f" && -s "$f" ]] && files+=("$f")
     done
 
@@ -285,13 +287,11 @@ make_plastid_db() {
         return 1
     fi
 
-    # build BLAST DB only if valid
-    if [[ ! -f "$plastid_dir/plastid_db.nsq" ]]; then
-        makeblastdb -in "$all_fasta" -dbtype nucl -out "$plastid_dir/plastid_db" >/dev/null 2>&1 || {
-            echo "ERROR: makeblastdb failed for $plastid_dir" >&2
-            return 1
-        }
-    fi
+    # rebuilt every run so a changed gene set is never searched with a stale DB
+    makeblastdb -in "$all_fasta" -dbtype nucl -out "$plastid_dir/plastid_db" >/dev/null 2>&1 || {
+        echo "ERROR: makeblastdb failed for $plastid_dir" >&2
+        return 1
+    }
 }
 
 blast_filter_frag() {
@@ -328,6 +328,11 @@ while IFS=',' read -r SPECIES ASSEMBLY PLASTID MITO; do
     FRAGMENTS_NUPT="$SPECIES_DIR/fragments/nupt"
     RESULTS="$SPECIES_DIR/results"
 
+    # start clean: fragments, alignments and Ka/Ks output of an earlier run would
+    # otherwise be reused (stale fragments from an older detection run, e.g. on
+    # organelle-annotated sequences, would end up in the AXT)
+    rm -rf "$ALIGN_PLASTID" "$FRAGMENTS_NUPT"
+    rm -f "$RESULTS/${SPECIES}_nupt_kaks.csv" "$RESULTS/${SPECIES}_nupt_kaks.csv".pre_* "$RESULTS/nupt_input.axt"
     mkdir -p "$ALIGN_PLASTID" "$FRAGMENTS_NUPT" "$RESULTS"
 
     if [[ ! -d "$PLASTID_GENES" ]]; then

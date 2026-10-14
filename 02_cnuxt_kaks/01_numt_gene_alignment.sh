@@ -15,7 +15,8 @@ IFS=$'\n\t'
 # CONFIGURATION
 ############################################################
 
-BASE_DIR="/vol/storage/5T_disk/organelles"
+BASE_DIR="${BASE_DIR:-$PWD}"   # working directory; override with BASE_DIR=...
+export BASE_DIR
 SPECIES_LIST="$1"
 
 THREADS=12
@@ -249,6 +250,7 @@ make_mito_db() {
 
     local files=()
     for f in "$mito_dir"/*.fasta; do
+        [[ "$(basename "$f")" == all_* ]] && continue      # our own concatenation
         [[ -f "$f" && -s "$f" ]] && files+=("$f")
     done
 
@@ -264,13 +266,12 @@ make_mito_db() {
         return 1
     fi
 
-    if [[ ! -f "$mito_dir/mito_db.nsq" ]]; then
-        makeblastdb -in "$all_fasta" -dbtype nucl \
-            -out "$mito_dir/mito_db" >/dev/null 2>&1 || {
-            echo "ERROR: makeblastdb failed for $mito_dir" >&2
-            return 1
-        }
-    fi
+    # rebuilt every run so a changed gene set is never searched with a stale DB
+    makeblastdb -in "$all_fasta" -dbtype nucl \
+        -out "$mito_dir/mito_db" >/dev/null 2>&1 || {
+        echo "ERROR: makeblastdb failed for $mito_dir" >&2
+        return 1
+    }
 }
 
 blast_filter_frag() {
@@ -302,12 +303,22 @@ while IFS=',' read -r SPECIES ASSEMBLY PLASTID MITO; do
 
     SPECIES_DIR="$BASE_DIR/species/$SPECIES"
     NUMT_FILE="$SPECIES_DIR/numts/numts.seq.fa"
-    MITO_GENES=$(ls -d "$BASE_DIR/downloads/mito_genes/${MITO}"* \
-        2>/dev/null | head -n1 || echo "")
+    # single mitochondrial chromosome -> its own gene folder; several chromosomes
+    # (accessions separated by ';') -> the merged per-species folder
+    if [[ "$MITO" != *";"* ]] && ls -d "$BASE_DIR/downloads/mito_genes/${MITO}"* &>/dev/null; then
+        MITO_GENES=$(ls -d "$BASE_DIR/downloads/mito_genes/${MITO}"* | head -n1)
+    else
+        MITO_GENES="$BASE_DIR/downloads/mito_genes_merged/${SPECIES}"
+    fi
     ALIGN_MITO="$SPECIES_DIR/alignments/mito"
     FRAGMENTS_NUMT="$SPECIES_DIR/fragments/numt"
     RESULTS="$SPECIES_DIR/results"
 
+    # start clean: fragments, alignments and Ka/Ks output of an earlier run would
+    # otherwise be reused (stale fragments from an older detection run, e.g. on
+    # organelle-annotated sequences, would end up in the AXT)
+    rm -rf "$ALIGN_MITO" "$FRAGMENTS_NUMT"
+    rm -f "$RESULTS/${SPECIES}_numt_kaks.csv" "$RESULTS/${SPECIES}_numt_kaks.csv".pre_* "$RESULTS/numt_input.axt"
     mkdir -p "$ALIGN_MITO" "$FRAGMENTS_NUMT" "$RESULTS"
 
     if [[ ! -f "$NUMT_FILE" ]]; then

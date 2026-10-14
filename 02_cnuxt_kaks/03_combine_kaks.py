@@ -80,6 +80,13 @@ for cls in ("nupt", "numt"):
             continue
         d.insert(0, "Species", sp)
         parts.append(d)
+    if not parts:
+        x = pd.DataFrame(status, columns=["species", "class", "n_genes", "status"])
+        x = x[x["class"] == cls]
+        sys.exit(f"{cls}: no Ka/Ks rows found. Per species:\n" + x.to_string(index=False)
+                 + f"\nExpected species/<SP>/results/<SP>_{cls}_kaks.csv (01_{cls}_gene_alignment.sh) "
+                 f"and >= {MIN_GENES} gene FASTAs in downloads/{{plastid,mito}}_genes/<ACC>/ "
+                 "or downloads/mito_genes_merged/<SP>/ (00_data/build_gene_sets.py)")
     out = pd.concat(parts, ignore_index=True)
     out.to_csv(f"all_species_{cls}_kaks.tsv", sep="\t", index=False)
     print(f"{cls}: {len(out)} coding rows from {out.Species.nunique()} species -> all_species_{cls}_kaks.tsv")
