@@ -277,17 +277,22 @@ process_species() {
         fi
         local nrec
         nrec=$(grep -c '^>' "$f" || true)
-        if [[ "$nrec" -ne 2 ]]; then
-            printf 'UNEXPECTED_RECORD_COUNT\t%s\t%s\n' "$aln_id" "$nrec" >> "$OUT_DIR/logs/extraction.log"
+        # Record 1 is the gene, record 2 the fragment. Alignments with a third
+        # record (the reverse-orientation fragment) still yield a valid pair.
+        if [[ "$nrec" -lt 2 ]]; then
+            printf 'TOO_FEW_RECORDS\t%s\t%s\n' "$aln_id" "$nrec" >> "$OUT_DIR/logs/extraction.log"
             continue
+        fi
+        if [[ "$nrec" -gt 2 ]]; then
+            printf 'MULTI_FRAGMENT_USING_RECORD2\t%s\t%s\n' "$aln_id" "$nrec" >> "$OUT_DIR/logs/extraction.log"
         fi
 
         awk -v qid="$(basename "$f" .mafft)" -v minlen="$MIN_SEQ_LEN" '
-            /^>/ { n++; seq=""; next }
-            n==2 { seq = seq $0 }
+            /^>/ { n++; next }
+            n==2 { frag = frag $0 }
             END {
-                gsub(/[-\r]/, "", seq)
-                if (length(seq) >= minlen) { print ">" qid; print toupper(seq) }
+                gsub(/[-\r]/, "", frag)
+                if (length(frag) >= minlen) { print ">" qid; print toupper(frag) }
             }
         ' "$f" >> "$OUT_DIR/dcnumts_all.fa"
         n_extracted=$((n_extracted+1))
