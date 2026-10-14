@@ -39,7 +39,7 @@ rm -rf "$OUT_DIR/per_gene"
 mkdir -p "$OUT_DIR/per_gene"
  
 python3 << 'EOF'
-import os, glob
+import os, glob, re
  
 BASE_DIR = "/vol/storage/5T_disk/organelles"
 SPECIES_DIR = os.path.join(BASE_DIR, "species")
@@ -94,6 +94,11 @@ n_collected = 0
 n_missing_seq = 0
 n_missing_axt = 0
 n_redundant = 0
+n_orf = 0
+# Unnamed reading frames (orf..., hypothetical, locus tags such as gp005 or
+# ZemaCp066, "unknown") cannot be matched across species, so they are left out
+# of clustering and branch models (they are counted as coding sequence in Table 1).
+ORF_TAG = re.compile(r"^(orf|hypothetical|gp\d|p\d{3}$|locus|unknown$|[A-Za-z]{2,6}(cp|mp)\d{2,}$)", re.I)
 species_contributing = set()
  
 # Identical sequences recovered from multiple scaffolds of the same species
@@ -142,6 +147,9 @@ for kaks_file in kaks_files:
             if not gene:
                 continue
             gene = normalize_gene_name(gene)
+            if ORF_TAG.match(gene):
+                n_orf += 1
+                continue
  
             key = (species, gene)
             seq_str = seqs[seq_id_raw]
@@ -165,6 +173,7 @@ print(f"Collection complete.")
 print(f"  Sequences collected: {n_collected}")
 print(f"  Species contributing: {len(species_contributing)}")
 print(f"  Redundant copies collapsed: {n_redundant}")
+print(f"  Unnamed reading frames skipped: {n_orf}")
 print(f"  Skipped (id not found in AXT): {n_missing_seq}")
 print(f"  Species with no nupt_input.axt: {n_missing_axt}")
 EOF

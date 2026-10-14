@@ -46,6 +46,8 @@ CLUSTER_DIR = os.path.join(BASE_DIR, "clustering_nupt", "clusters")
 SINGLES_DIR = os.path.join(BASE_DIR, "clustering_nupt", "singles")
 
 
+CODEML_TIMEOUT = 3600  # seconds per model; guards against non-convergence
+
 def set_organelle(kind):
     """Point the module at plastid or mitochondrial inputs.
 
@@ -211,8 +213,21 @@ def run_one(args):
                                         fix_omega=fix_omega))
         # codeml exits non-zero with "error: end of tree file." even after a
         # successful single-tree run, so exit status is not informative.
-        subprocess.run(["codeml", f"{model}.ctl"], cwd=codeml_dir,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        #
+        # stdin=DEVNULL matters: codeml prompts interactively when it cannot
+        # parse an input, and with stdout suppressed the prompt is invisible,
+        # so the process sleeps forever consuming no CPU. Feeding it EOF turns
+        # that into an immediate failure instead of an indefinite hang. The
+        # timeout is a second guard against non-convergence on large
+        # alignments.
+        try:
+            with open(os.path.join(codeml_dir, f"{model}.log"), "w") as log:
+                subprocess.run(["codeml", f"{model}.ctl"], cwd=codeml_dir,
+                               stdin=subprocess.DEVNULL,
+                               stdout=log, stderr=subprocess.STDOUT,
+                               timeout=CODEML_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            return (name, "codeml_timeout")
 
     ok_a = has_lnl(os.path.join(codeml_dir, "modelA.out"))
     ok_b = has_lnl(os.path.join(codeml_dir, "modelB.out"))

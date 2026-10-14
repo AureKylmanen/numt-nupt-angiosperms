@@ -49,9 +49,16 @@ PLASTID_DIR = "/vol/storage/5T_disk/organelles/downloads/plastid_genes"
 OUT_DIR = "/vol/storage/5T_disk/organelles/selection_nupt/background"
 MAFFT_THREADS = 4
 GENETIC_CODE = 11
+# Records labelled plastid in GenBank that are not plastid genomes (identified in
+# the accession audit; PP476489.3 is a mitochondrial record and attached to the
+# rpl16 trees on a ~1 substitution/site branch). Never used as background.
+EXCLUDE_ACC = {"PP476489", "NC_016005", "OP649456", "OP154037"}
+excluded = lambda d: os.path.basename(d).split(".")[0] in EXCLUDE_ACC
 
 all_genes = set()
 for acc_dir in glob.glob(os.path.join(PLASTID_DIR, "*")):
+    if excluded(acc_dir):
+        continue
     for f in glob.glob(os.path.join(acc_dir, "*.fasta")):
         all_genes.add(os.path.basename(f).replace(".fasta", ""))
 
@@ -66,6 +73,8 @@ for gene in sorted(all_genes):
 
     nuc_seqs = {}
     for acc_dir in glob.glob(os.path.join(PLASTID_DIR, "*")):
+        if excluded(acc_dir):
+            continue
         acc = os.path.basename(acc_dir)
         gene_file = os.path.join(acc_dir, f"{gene}.fasta")
         if not os.path.exists(gene_file):
