@@ -17,7 +17,8 @@ IFS=$'\n\t'
 ########################################################
 # CONFIG
 ########################################################
-BASE_DIR="/vol/storage/5T_disk/organelles"
+BASE_DIR="${BASE_DIR:-$PWD}"   # working directory; override with BASE_DIR=...
+export BASE_DIR
 SPECIES_DIR="$BASE_DIR/species"
 MITO_DB="/vol/storage/mt_database/mito_db"
 KAKS_BIN="/vol/storage/software/KaKs_Calculator2.0/bin/Linux/KaKs_Calculator"
@@ -41,7 +42,7 @@ mkdir -p "$OUT_DIR/per_gene"
 python3 << 'EOF'
 import os, glob, re
 
-BASE_DIR = "/vol/storage/5T_disk/organelles"
+BASE_DIR = os.environ["BASE_DIR"]
 SPECIES_DIR = os.path.join(BASE_DIR, "species")
 OUT_DIR = os.path.join(BASE_DIR, "clustering_numt")
 KS_THRESH = 0.1
@@ -277,7 +278,7 @@ python3 << 'EOF'
 import os, glob, subprocess
 from collections import defaultdict
 
-BASE_DIR = "/vol/storage/5T_disk/organelles"
+BASE_DIR = os.environ["BASE_DIR"]
 OUT_DIR = os.path.join(BASE_DIR, "clustering_numt")
 MITO_DB = "/vol/storage/mt_database/mito_db"
 KS_THRESH = 0.1

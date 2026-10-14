@@ -19,7 +19,7 @@ import subprocess
 import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-BASE_DIR = "/vol/storage/5T_disk/organelles"
+BASE_DIR = os.environ.get("BASE_DIR", os.getcwd())
 
 
 def normalise_organelle(kind):

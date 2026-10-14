@@ -18,7 +18,8 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-BASE_DIR="/vol/storage/5T_disk/organelles"
+BASE_DIR="${BASE_DIR:-$PWD}"   # working directory; override with BASE_DIR=...
+export BASE_DIR
 MITO_GENES_DIR="$BASE_DIR/downloads/mito_genes"
 CLUSTER_DIR="$BASE_DIR/clustering_numt/clusters"
 SINGLES_DIR="$BASE_DIR/clustering_numt/singles"
@@ -46,8 +47,8 @@ import os, glob, subprocess
 from Bio import SeqIO
 from Bio.Seq import Seq
 
-MITO_DIR = "/vol/storage/5T_disk/organelles/downloads/mito_genes"
-OUT_DIR = "/vol/storage/5T_disk/organelles/selection_numt/background"
+MITO_DIR = os.path.join(os.environ["BASE_DIR"], "downloads/mito_genes")
+OUT_DIR = os.path.join(os.environ["BASE_DIR"], "selection_numt/background")
 MAFFT_THREADS = 4
 GENETIC_CODE = 1
 

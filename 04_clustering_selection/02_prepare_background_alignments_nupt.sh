@@ -17,7 +17,8 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-BASE_DIR="/vol/storage/5T_disk/organelles"
+BASE_DIR="${BASE_DIR:-$PWD}"   # working directory; override with BASE_DIR=...
+export BASE_DIR
 PLASTID_GENES_DIR="$BASE_DIR/downloads/plastid_genes"
 CLUSTER_DIR="$BASE_DIR/clustering_nupt/clusters"
 SINGLES_DIR="$BASE_DIR/clustering_nupt/singles"
@@ -45,8 +46,8 @@ import os, glob, subprocess
 from Bio import SeqIO
 from Bio.Seq import Seq
 
-PLASTID_DIR = "/vol/storage/5T_disk/organelles/downloads/plastid_genes"
-OUT_DIR = "/vol/storage/5T_disk/organelles/selection_nupt/background"
+PLASTID_DIR = os.path.join(os.environ["BASE_DIR"], "downloads/plastid_genes")
+OUT_DIR = os.path.join(os.environ["BASE_DIR"], "selection_nupt/background")
 MAFFT_THREADS = 4
 GENETIC_CODE = 11
 # Records labelled plastid in GenBank that are not plastid genomes (identified in
