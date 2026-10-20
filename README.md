@@ -322,6 +322,20 @@ species summary again → 02 steps 4–9 → 03_comparative → 04_clustering_se
 
 ---
 
+## Data
+
+`data/` contains the merged NUPT and NUMT loci for all 537 species
+(one BED file per species and class, fragments merged within 10 kb),
+as produced by `numt_nupt_detection.sh`:
+
+- `nupt_merged_beds.tar.gz`: `<Species>_nupt_merged.bed`
+- `numt_merged_beds.tar.gz`: `<Species>_numt_merged.bed`
+
+Coordinates refer to the nuclear assemblies listed in the species table.
+See `data/README.md` for column definitions.
+
+---
+
 ## References
  
 - Chen Y.-C. *et al.* (2025) *Genome Research*. Predecessor vertebrate NUMT pipeline.
